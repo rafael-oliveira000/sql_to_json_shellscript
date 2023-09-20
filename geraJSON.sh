@@ -28,7 +28,8 @@
 #   v1.4 20/09/2023, Rafael:
 #       - Corrigido o bug do HLR_P inexistente
 #		- Adicionado extrai_profile
-#		- 
+#   v1.4 20/09/2023, Rafael:
+#       - Adicionado funcao possui_feature
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
@@ -253,9 +254,28 @@ extrai_lst_feature_prev() {
 }
 # ------------------------------------------------------------------------ #
 
+possui_feature(){
+	# $1 -> lst_feature(_prev)
+	# $2 -> HSS, 5GNSA ou 5GSA
+	lista_feature=$1
+	feature=$2
+	
+	# Extrai a linha com feature da lista de feature e a armazena na variavel "linha"
+	linha=$(echo "$lista_feature" | grep "$feature")
+
+	# Verifica se a linha foi encontrada
+	if [ -z "$linha" ]; then
+		echo "no"
+	else
+		echo "yes"
+	fi
+}
+
+# ------------------------------------------------------------------------ #
+
+extrai_feature(){
 #	$1 -> lst_feature(_prev)
 #	$2 -> feature (HLR, acao)
-extrai_feature(){
 	lista_feature=$1
 	feature=$2
 	
@@ -274,6 +294,8 @@ extrai_feature(){
 }
 
 # ------------------------------------------------------------------------ #
+
+escreve_json(){
 #	$1 -> req_id
 #	$2 -> acao
 #	$3 -> telefone
@@ -281,8 +303,13 @@ extrai_feature(){
 #	$5 -> HLR_P
 #	$6 -> profile_N
 #	$7 -> profine_P
+#	$8 -> $HSS_N
+#	$9 -> $HSS_P
+#	$10-> $_5GNSA_N
+#	$11-> $_5GNSA_P
+#	$12-> $_5GSA_N
+#	$13-> $_5GSA_P
 
-escreve_json(){
 	local json="
 {
    "ordem":{
@@ -461,7 +488,16 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		HLR_P=$(extrai_HLR "$lst_feature_prev")
 		profile_N=$(extrai_profile "$lst_feature")
 		profile_P=$(extrai_profile "$lst_feature_prev")
-
+		
+		
+		HSS_N=$(possui_feature "$lst_feature" "=HSS;")
+		HSS_P=$(possui_feature "$lst_feature_prev" "=HSS;")
+		
+		_5GNSA_N=$(possui_feature "$lst_feature" "=5GNSA;")
+		_5GNSA_P=$(possui_feature "$lst_feature_prev" "=5GNSA;")
+		
+		_5GSA_N=$(possui_feature "$lst_feature" "=5GSA;")
+		_5GSA_P=$(possui_feature "$lst_feature_prev" "=5GSA;")
 		
 		echo "------------------------"
 		echo $nome_arquivo
@@ -473,6 +509,12 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		echo "HLR_P: $HLR_P"
 		echo "profile_N: $profile_N"
 		echo "profile_P: $profile_P"
+		echo "HSS_N:----$HSS_N"
+		echo "HSS_P:----$HSS_P"
+		echo "5GNSA_N:--$_5GNSA_N"
+		echo "5GNSA_P:--$_5GNSA_P"
+		echo "5GSA_N:---$_5GSA_N"
+		echo "5GSA_P:---$_5GSA_P"
 #		echo "------------------------"
 #		echo "lst_feature: $lst_feature"
 #		echo "------------------------"
@@ -480,9 +522,10 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 #		echo "------------------------"
 
 		
-		escreve_json $req_id $acao $telefone $HLR_N $HLR_P $profile_N $profile_P > $arquivo_destino
-		
-		
+		escreve_json $req_id $acao $telefone $HLR_N $HLR_P $profile_N $profile_P $HSS_N $HSS_P $_5GNSA_N $_5GNSA_P $_5GSA_N $_5GSA_P > $arquivo_destino
+		                                                                                       
+		# Adicionar json+= para HSS 5GNSA e 5GSA                                               
+		                                                                                       
     	fi
 done
 
