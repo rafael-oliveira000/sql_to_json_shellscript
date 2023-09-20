@@ -17,15 +17,24 @@
 # Historico:
 #
 #   v1.1 18/09/2023, Rafael:
-#       - Versao inicial que extrai informacoes do .sql
+#		- Versao inicial que extrai informacoes do .sql
+#   v1.2 19/09/2023, Rafael:
+#		- Adicionado funções para extrair o imsi e hlr e gerar
+#		parcialmente o arquivo json
+#		- Criado a melhoria extrai_feature para evitar repeticao
+#		de codigo.
+#   v1.3 20/09/2023, Rafael:
+#       - Corrigido o bug da melhoria extrai_feature
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
 # ------------------------------------------------------------------------ #
 
-# ------------------------------- MELHORIAS ------------------------------ #
-#	Ajustar as aspas do json de saida. Os campos chave-valor do json 
+# ----------------------- MELHORIAS A SEREM FEITAS------------------------ #
+#	- Ajustar as aspas do json de saida. Os campos chave-valor do json 
 #	devem estar entre aspas.
+#	- Criar uma função unica para testar a existencia do arquivo 
+#	e testar apenas uma vez para cada arquivo.
 # ------------------------------------------------------------------------ #
 
 # ------------------------------- VARIAVEIS ------------------------------ #
@@ -87,6 +96,7 @@ extrai_req_id(){
         echo "$req_id"
 }
 # ------------------------------------------------------------------------ #
+
 extrai_telefone(){
         # Verifica se foi fornecido o nome do arquivo como argumento
         if [ $# -ne 1 ]; then
@@ -123,6 +133,7 @@ extrai_telefone(){
         echo "$telefone"
 }
 # ------------------------------------------------------------------------ #
+
 extrai_imsi(){
         # Verifica se foi fornecido o nome do arquivo como argumento
         if [ $# -ne 1 ]; then
@@ -159,22 +170,22 @@ extrai_imsi(){
         echo "$imsi"
 }
 # ------------------------------------------------------------------------ #
+
 extrai_acao(){
-	acao=$(extrai_feature "$1" "SRV_TRX_TP_CD_ORIG")
+	acao=$(extrai_feature "$1" "SRV_TRX_TP_CD=")
 	echo $acao
 }	
 	
 # ------------------------------------------------------------------------ #
-extrai_HLR_N(){
-	HLR_N=$(extrai_feature "$1" ";HLR=")
-	echo $HLR_N
-}	
 
-# ------------------------------------------------------------------------ #
-extrai_HLR_P(){
-	HLR_P=$(extrai_feature "$1" ";HLR=")
-	echo $HLR_P
+extrai_HLR(){
+	#					  $1 -> lst_feature(_prev)
+	lista_feature=$1
+	HLR=$(extrai_feature "$lista_feature" ";HLR=")
+	echo $HLR
+	
 }
+
 # ------------------------------------------------------------------------ #
 
 extrai_FTRCD() {
@@ -204,6 +215,7 @@ extrai_FTRCD() {
 #	echo "lst_feature_prevFUNCAO"
 }
 # ------------------------------------------------------------------------ #
+
 extrai_lst_feature() {
 	lst_FTRCD=$(extrai_FTRCD $1)
 	
@@ -229,30 +241,26 @@ extrai_lst_feature_prev() {
 }
 # ------------------------------------------------------------------------ #
 
-# Alterar pra usar lst_feature ou lst_feature_prev invés de 1 ou 2
-
+#	$1 -> lst_feature(_prev)
+#	$2 -> feature (HLR, acao)
 extrai_feature(){
-	#Funcao para extrair valor da feature.
-	# $1 -> string
-	# $2 -> feature
+	lista_feature=$1
+	feature=$2
 	
-	string=$1
+	# Extrai a linha com feature da lista de feature e a armazena na variavel "linha"
+	linha=$(echo "$lista_feature" | grep "$feature")
 
-	# Utiliza o comando 'grep' para encontrar a linha que contem o primeiro "$2" e extrair a informacao entre "=" e ";"
-	feature=$(grep -m 1 "$2" "$string" | sed 's/.*=\(.*\);@/\1/')
-		
-	# Verifica se a variavel "feature" esta vazia
-	if [ -n "$feature" ]; then
-		feature="${feature%?}"
-		echo "$feature"
-	else
-		#Comentario para facilitar debug		
-
-		echo ""
+	# Verifica se a linha foi encontrada
+	if [ -z "$linha" ]; then
+		echo "Nenhuma linha contendo '$2' foi encontrada na lista de feature."
+		exit 1
 	fi
+	#Extrair o valor da feature
+	valor=$(echo "$linha" | sed -n "s/.*$feature\([^;]*\).*/\1/p")
 
-
+	echo "$valor"
 }
+
 # ------------------------------------------------------------------------ #
 #	$1 -> req_id
 #	$2 -> acao
@@ -404,12 +412,13 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		lst_feature=$(extrai_lst_feature "$arquivo_origem")
 		lst_feature_prev=$(extrai_lst_feature_prev "$arquivo_origem")
 		
-		acao=$(extrai_acao "$arquivo_origem")
 		req_id=$(extrai_req_id "$arquivo_origem")
 		telefone=$(extrai_telefone "$arquivo_origem")
 		imsi=$(extrai_imsi "$arquivo_origem")
-		HLR_N=$(extrai_HLR_N "$lst_feature")
-		HLR_P=$(extrai_HLR_P "$lst_feature_prev")
+		
+		acao=$(extrai_acao "$lst_feature")
+		HLR_N=$(extrai_HLR "$lst_feature")
+		HLR_P=$(extrai_HLR "$lst_feature_prev")
 
 		
 		echo "------------------------"
@@ -421,15 +430,15 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		echo "HLR_N: $HLR_N"
 		echo "HLR_P: $HLR_P"
 		echo "------------------------"
-		echo "lst_feature: $lst_feature"
-		echo "------------------------"
-		echo "lst_feature_prev: $lst_feature_prev"
-		echo "------------------------"
-		
+#		echo "lst_feature: $lst_feature"
+#		echo "------------------------"
+#		echo "lst_feature_prev: $lst_feature_prev"
+#		echo "------------------------"
+
 		
 		escreve_json $req_id $acao $telefone $HLR_N $HLR_P > $arquivo_destino
 		
-		
+		# Proximo passo: escrever a logica do profile
 		
     	fi
 done
