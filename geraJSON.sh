@@ -25,6 +25,10 @@
 #		de codigo.
 #   v1.3 20/09/2023, Rafael:
 #       - Corrigido o bug da melhoria extrai_feature
+#   v1.4 20/09/2023, Rafael:
+#       - Corrigido o bug do HLR_P inexistente
+#		- Adicionado extrai_profile
+#		- 
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
@@ -179,11 +183,19 @@ extrai_acao(){
 # ------------------------------------------------------------------------ #
 
 extrai_HLR(){
-	#					  $1 -> lst_feature(_prev)
+	# $1 -> lst_feature(_prev)
 	lista_feature=$1
 	HLR=$(extrai_feature "$lista_feature" ";HLR=")
 	echo $HLR
-	
+}
+
+# ------------------------------------------------------------------------ #
+
+extrai_profile(){
+	#$1 -> lst_feature(_prev)
+	lista_feature=$1
+	profile=$(extrai_feature "$lista_feature" ";PROFILEID=")
+	echo $profile
 }
 
 # ------------------------------------------------------------------------ #
@@ -252,8 +264,8 @@ extrai_feature(){
 
 	# Verifica se a linha foi encontrada
 	if [ -z "$linha" ]; then
-		echo "Nenhuma linha contendo '$2' foi encontrada na lista de feature."
-		exit 1
+#		echo "Nenhuma linha contendo '$2' foi encontrada na lista de feature."
+		echo ""
 	fi
 	#Extrair o valor da feature
 	valor=$(echo "$linha" | sed -n "s/.*$feature\([^;]*\).*/\1/p")
@@ -267,7 +279,8 @@ extrai_feature(){
 #	$3 -> telefone
 #	$4 -> HLR_N
 #	$5 -> HLR_P
-#	$6 -> profile
+#	$6 -> profile_N
+#	$7 -> profine_P
 
 escreve_json(){
 	local json="
@@ -363,25 +376,52 @@ escreve_json(){
                             ]
                         },"
 	fi
-	json+="	
-                        {
-                            "servico":{
-                                "id":"PROFILE"
-                            },
-                            "operacao":{
-                                "id":"ACT"
-                            },
-                            "parametro":[
-                                {
-                                    "nome":"PROFILEID",
-                                    "valor":"$6"
-                                }
-                            ]
-                        },"
-
+	
+#	Se profile_N nao estiver vazia, escrever o bloco com profile_N.
+	testa_profile_N=""
+	testa_profile_N=$6
+	if [ -n "$testa_profile_N" ]; then
+		json+="	
+						{
+							"servico":{
+								"id":"PROFILE"
+							},
+							"operacao":{
+								"id":"ACT"
+							},
+							"parametro":[
+								{
+									"nome":"PROFILEID",
+									"valor":"$6"
+								}
+							]
+						},"
+	fi
+	
+#	Se profile_P nao estiver vazia, escrever o bloco com profile_P.
+	testa_profile_P=""
+	testa_profile_P=$7
+	if [ -n "$testa_profile_P" ]; then
+		json+="	
+						{
+							"servico":{
+								"id":"PROFILE"
+							},
+							"operacao":{
+								"id":"CAN"
+							},
+							"parametro":[
+								{
+									"nome":"PROFILEID",
+									"valor":"$7"
+								}
+							]
+						},"
+	fi
+	
 	echo "$json"
+	# Essa chave fecha o escreve_json
 }
-
 # ------------------------------------------------------------------------ #
 
 # ------------------------------- EXECUCAO ------------------------------- #
@@ -419,6 +459,8 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		acao=$(extrai_acao "$lst_feature")
 		HLR_N=$(extrai_HLR "$lst_feature")
 		HLR_P=$(extrai_HLR "$lst_feature_prev")
+		profile_N=$(extrai_profile "$lst_feature")
+		profile_P=$(extrai_profile "$lst_feature_prev")
 
 		
 		echo "------------------------"
@@ -429,16 +471,17 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		echo "IMSI: $imsi"
 		echo "HLR_N: $HLR_N"
 		echo "HLR_P: $HLR_P"
-		echo "------------------------"
+		echo "profile_N: $profile_N"
+		echo "profile_P: $profile_P"
+#		echo "------------------------"
 #		echo "lst_feature: $lst_feature"
 #		echo "------------------------"
 #		echo "lst_feature_prev: $lst_feature_prev"
 #		echo "------------------------"
 
 		
-		escreve_json $req_id $acao $telefone $HLR_N $HLR_P > $arquivo_destino
+		escreve_json $req_id $acao $telefone $HLR_N $HLR_P $profile_N $profile_P > $arquivo_destino
 		
-		# Proximo passo: escrever a logica do profile
 		
     	fi
 done
