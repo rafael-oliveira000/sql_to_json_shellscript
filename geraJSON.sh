@@ -30,6 +30,8 @@
 #		- Adicionado extrai_profile
 #   v1.4 20/09/2023, Rafael:
 #       - Adicionado funcao possui_feature
+#   v1.5 21/09/2023, Rafael:
+#       - Adicionado tratamento para HSS, 5GNSA e 5GSA
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
@@ -265,7 +267,7 @@ possui_feature(){
 
 	# Verifica se a linha foi encontrada
 	if [ -z "$linha" ]; then
-		echo "no"
+		echo ""
 	else
 		echo "yes"
 	fi
@@ -378,6 +380,7 @@ escreve_json(){
                                 }
                             ]
                         },"
+
 #	Se HLR_P nao estiver vazia, escrever o bloco com HLR_P.
 	testa_HLR_P=""
 	testa_HLR_P=$5
@@ -446,9 +449,100 @@ escreve_json(){
 						},"
 	fi
 	
+#	Se HSS_N nao estiver vazia, escrever o bloco com HSS_N.
+	testa_HSS_N=""
+	testa_HSS_N=$8
+	if [ -n "$testa_HSS_N" ]; then
+		json+="	
+                        {
+                           "servico":{
+                              "id":"HSS"
+                           },
+                           "operacao":{
+                              "id":"ACT"
+                           }
+                        },"
+	fi
+	
+#	Se HSS_P nao estiver vazia, escrever o bloco com HSS_P.
+	testa_HSS_P=""
+	testa_HSS_P=$9
+	if [ -n "$testa_HSS_P" ]; then
+		json+="	
+                        {
+                           "servico":{
+                              "id":"HSS"
+                           },
+                           "operacao":{
+                              "id":"CAN"
+                           }
+                        },"
+	fi
+
+#	Se _5GNSA_N nao estiver vazia, escrever o bloco com 5GNSA.
+	testa_5GNSA_N=""
+	testa_5GNSA_N=${10}
+	if [ -n "$testa_5GNSA_N" ]; then
+		json+="	
+                        {
+                           "servico":{
+                              "id":"5GNSA"
+                           },
+                           "operacao":{
+                              "id":"ACT"
+                           }
+                        },"
+	fi
+
+#	Se _5GNSA_P nao estiver vazia, escrever o bloco com 5GNSA.
+	testa_5GNSA_P=""
+	testa_5GNSA_P=${11}
+	if [ -n "$testa_5GNSA_P" ]; then
+		json+="	
+                        {
+                           "servico":{
+                              "id":"5GNSA"
+                           },
+                           "operacao":{
+                              "id":"CAN"
+                           }
+                        },"
+	fi
+
+#	Se _5GSA_N nao estiver vazia, escrever o bloco com 5GSA.
+	testa_5GSA_N=""
+	testa_5GSA_N=${12}
+	if [ -n "$testa_5GSA_N" ]; then
+		json+="	
+                        {
+                           "servico":{
+                              "id":"5GSA"
+                           },
+                           "operacao":{
+                              "id":"ACT"
+                           }
+                        },"
+	fi
+
+#	Se _5GSA_P nao estiver vazia, escrever o bloco com 5GSA.
+	testa_5GSA_P=""
+	testa_5GSA_P=${13}
+	if [ -n "$testa_5GSA_P" ]; then
+		json+="	
+                        {
+                           "servico":{
+                              "id":"5GSA"
+                           },
+                           "operacao":{
+                              "id":"CAN"
+                           }
+                        },"
+	fi
+
 	echo "$json"
 	# Essa chave fecha o escreve_json
 }
+
 # ------------------------------------------------------------------------ #
 
 # ------------------------------- EXECUCAO ------------------------------- #
@@ -521,8 +615,8 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 #		echo "lst_feature_prev: $lst_feature_prev"
 #		echo "------------------------"
 
-		
-		escreve_json $req_id $acao $telefone $HLR_N $HLR_P $profile_N $profile_P $HSS_N $HSS_P $_5GNSA_N $_5GNSA_P $_5GSA_N $_5GSA_P > $arquivo_destino
+		#Funcao 	 $1		  $2	  $3		  $4	   $5		$6			 $7			  $8	   $9		${10}		${11}		${12}	   ${13}
+		escreve_json $req_id "$acao" "$telefone" "$HLR_N" "$HLR_P" "$profile_N" "$profile_P" "$HSS_N" "$HSS_P" "$_5GNSA_N" "$_5GNSA_P" "$_5GSA_N" "$_5GSA_P" > $arquivo_destino
 		                                                                                       
 		# Adicionar json+= para HSS 5GNSA e 5GSA                                               
 		                                                                                       
