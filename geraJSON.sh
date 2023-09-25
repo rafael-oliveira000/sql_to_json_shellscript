@@ -32,14 +32,17 @@
 #       - Adicionado funcao possui_feature
 #   v1.5 21/09/2023, Rafael:
 #       - Adicionado tratamento para HSS, 5GNSA e 5GSA
+#   v1.6 21/09/2023, Rafael:
+#       - Ajustado as aspas do json de saida
+#		- Adicionado escreve_json2 para tratar as features SLICE, DNN e APN
+#   v1.6 25/09/2023, Rafael:
+#		- Ajustado bug das virgulas no json
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
 # ------------------------------------------------------------------------ #
 
 # ----------------------- MELHORIAS A SEREM FEITAS------------------------ #
-#	- Ajustar as aspas do json de saida. Os campos chave-valor do json 
-#	devem estar entre aspas.
 #	- Criar uma função unica para testar a existencia do arquivo 
 #	e testar apenas uma vez para cada arquivo.
 # ------------------------------------------------------------------------ #
@@ -96,8 +99,8 @@ extrai_req_id(){
         req_id=$(echo "$linha" | cut -d ',' -f 56)
 
         #Remove as aspas
-#        req_id="${req_id#?}"
-#        req_id="${req_id%?}"
+        req_id="${req_id#?}"
+        req_id="${req_id%?}"
 
         # Imprime o valor da variavel req_id na tela
         echo "$req_id"
@@ -133,8 +136,8 @@ extrai_telefone(){
         telefone=$(echo "$linha" | cut -d ',' -f 58)
 
         #Remove as aspas
-#        telefone="${telefone#?}"
-#        telefone="${telefone%?}"
+        telefone="${telefone#?}"
+        telefone="${telefone%?}"
 
         #Imprime o numero do telefone
         echo "$telefone"
@@ -199,6 +202,52 @@ extrai_profile(){
 	lista_feature=$1
 	profile=$(extrai_feature "$lista_feature" ";PROFILEID=")
 	echo $profile
+}
+
+# ------------------------------------------------------------------------ #
+	
+extrai_slice(){
+	# $1 -> lst_feature(_prev)
+	lista_feature=$1
+	slice=$(possui_feature "$lista_feature" "=SLICE")
+	
+	# Seleciona os slices da lst_feature(_prev)
+	lista_slice=$(echo "$slice" | cut -c7-14)
+	
+	#Conta o numero de slices
+	num_slices=$(echo "$lista_slice" | wc -w | awk '{print $1}')
+	
+	slice_name=$(echo "$slice" | cut -c7-14)
+	slice_id=$(echo "$slice" | cut -c37-37)
+	slice_default=$(extrai_feature "$slice" "DEFAULT=")
+	
+	
+	# Separar os valores das variáveis
+	IFS=' ' read -ra slice_name_values <<< "$slice_name"
+	resultado1_slice_name="${slice_name_values[0]}"
+	resultado2_slice_name="${slice_name_values[1]}"
+	
+	IFS=' ' read -ra slice_id_values <<< "$slice_id"
+	resultado1_slice_id="${slice_id_values[0]}"
+	resultado2_slice_id="${slice_id_values[1]}"
+	
+	IFS=' ' read -ra slice_default_values <<< "$slice_default"
+	resultado1_slice_default="${slice_default_values[0]}"
+	resultado2_slice_default="${slice_default_values[1]}"
+	
+	# Imprimir os resultados
+	echo "Resultado 1 de slice_name: $resultado1_slice_name"
+	echo "Resultado 1 de slice_id: $resultado1_slice_id"
+	echo "Resultado 1 de slice_default: $resultado1_slice_default"
+
+	echo "Resultado 2 de slice_name: $resultado2_slice_name"
+	echo "Resultado 2 de slice_id: $resultado2_slice_id"
+	echo "Resultado 2 de slice_default: $resultado2_slice_default"
+	
+#	echo $slice_name
+#	echo $slice_id
+#	echo $slice_default
+	
 }
 
 # ------------------------------------------------------------------------ #
@@ -269,7 +318,7 @@ possui_feature(){
 	if [ -z "$linha" ]; then
 		echo ""
 	else
-		echo "yes"
+		echo "$linha"
 	fi
 }
 
@@ -314,233 +363,285 @@ escreve_json(){
 
 	local json="
 {
-   "ordem":{
-      "correlacao":[
+   \"ordem\":{
+      \"correlacao\":[
          {
-            "id":"$1",
-            "sistema-origem":{
-               "id":"SGIOT"
+            \"id\":\"$1\",
+            \"sistema-origem\":{
+               \"id\":\"SGIOT\"
             },
-            "endereco-resposta":"http://10.18.81.219:8004/FachadaWoaSgiot/rest"
+            \"endereco-resposta\":\"http://10.18.81.219:8004/FachadaWoaSgiot/rest\"
          }
       ],
-      "operacao":{
-         "id":"$2",
-         "situacao-operacao":{
-            "data":"2023-05-30T08:00:10-03:00"
+      \"operacao\":{
+         \"id\":\"$2\",
+         \"situacao-operacao\":{
+            \"data\":\"2023-05-30T08:00:10-03:00\"
          },
-         "motivo":{
-            "id":"PROVISIONING"
+         \"motivo\":{
+            \"id\":\"PROVISIONING\"
          },
-         "usuario":{
-            "id":"SGIOT"
+         \"usuario\":{
+            \"id\":\"SGIOT\"
          },
-         "prioridade":"10"
+         \"prioridade\":\"10\"
       },
-      "cliente":{
-         "id":"111008173"
+      \"cliente\":{
+         \"id\":\"111008173\"
       },
-      "item-ordem":[
+      \"item-ordem\":[
          {
-            "produto-alvo":{
-               "recurso-telefonia":{
-                  "numeracao":{
-                     "numero-telefone":"$3"
+            \"produto-alvo\":{
+               \"recurso-telefonia\":{
+                  \"numeracao\":{
+                     \"numero-telefone\":\"$3\"
                   },
-                  "simcard":{
-                     "iccid":"89550031310007761975",
-                     "imsi":"724003100569646",
-                     "pin":"3636",
-                     "puk":"3636",
-                     "pin2":"3636",
-                     "puk2":"3636",
-                     "ki":"259146167291242D4F5127D9AC5CB8A5",
-                     "tk":"178",
-                     "chv5":"761446455758488D",
-                     "op":"13"
+                  \"simcard\":{
+                     \"iccid\":\"89550031310007761975\",
+                     \"imsi\":\"724003100569646\",
+                     \"pin\":\"3636\",
+                     \"puk\":\"3636\",
+                     \"pin2\":\"3636\",
+                     \"puk2\":\"3636\",
+                     \"ki\":\"259146167291242D4F5127D9AC5CB8A5\",
+                     \"tk\":\"178\",
+                     \"chv5\":\"761446455758488D\",
+                     \"op\":\"13\"
                   },
-                  "perfil-aprovisionamento":{
-                     "id":"30",
-                     "comando-aprovisionamento":[
+                  \"perfil-aprovisionamento\":{
+                     \"id\":\"30\",
+                     \"comando-aprovisionamento\":[
                         {
-                            "servico": {
-                                "id": "EQPT"
+                            \"servico\": {
+                                \"id\": \"EQPT\"
                             },
-                            "operacao": {
-                                "id": "ACT"
+                            \"operacao\": {
+                                \"id\": \"ACT\"
                             },
-                            "parametro": [
+                            \"parametro\": [
                                 {
-                                    "nome": "HLR",
-                                    "valor": "$4"
+                                    \"nome\": \"HLR\",
+                                    \"valor\": \"$4\"
                                 },
                                 {
-                                    "nome": "HSSDRA",
-                                    "valor": "HSSRJ3MG3"
+                                    \"nome\": \"HSSDRA\",
+                                    \"valor\": \"HSSRJ3MG3\"
                                 }
                             ]
-                        },"
+                        }"
 
 #	Se HLR_P nao estiver vazia, escrever o bloco com HLR_P.
 	testa_HLR_P=""
 	testa_HLR_P=$5
 	if [ -n "$testa_HLR_P" ]; then
 	
-	json+="
+	json+=",
                         {
-                            "servico": {
-                                "id": "EQPT"
+                            \"servico\": {
+                                \"id\": \"EQPT\"
                             },
-                            "operacao": {
-                                "id": "CAN"
+                            \"operacao\": {
+                                \"id\": \"CAN\"
                             },
-                            "parametro": [
+                            \"parametro\": [
                                 {
-                                    "nome": "HLR",
-                                    "valor": "$5"
+                                    \"nome\": \"HLR\",
+                                    \"valor\": \"$5\"
                                 },
                                 {
-                                    "nome": "HSSDRA",
-                                    "valor": "HSSRJ3MG3"
+                                    \"nome\": \"HSSDRA\",
+                                    \"valor\": \"HSSRJ3MG3\"
                                 }
                             ]
-                        },"
+                        }"
 	fi
 	
 #	Se profile_N nao estiver vazia, escrever o bloco com profile_N.
 	testa_profile_N=""
 	testa_profile_N=$6
 	if [ -n "$testa_profile_N" ]; then
-		json+="	
+		json+=",	
 						{
-							"servico":{
-								"id":"PROFILE"
+							\"servico\":{
+								\"id\":\"PROFILE\"
 							},
-							"operacao":{
-								"id":"ACT"
+							\"operacao\":{
+								\"id\":\"ACT\"
 							},
-							"parametro":[
+							\"parametro\":[
 								{
-									"nome":"PROFILEID",
-									"valor":"$6"
+									\"nome\":\"PROFILEID\",
+									\"valor\":\"$6\"
 								}
 							]
-						},"
+						}"
 	fi
 	
 #	Se profile_P nao estiver vazia, escrever o bloco com profile_P.
 	testa_profile_P=""
 	testa_profile_P=$7
 	if [ -n "$testa_profile_P" ]; then
-		json+="	
+		json+=",
 						{
-							"servico":{
-								"id":"PROFILE"
+							\"servico\":{
+								\"id\":\"PROFILE\"
 							},
-							"operacao":{
-								"id":"CAN"
+							\"operacao\":{
+								\"id\":\"CAN\"
 							},
-							"parametro":[
+							\"parametro\":[
 								{
-									"nome":"PROFILEID",
-									"valor":"$7"
+									\"nome\":\"PROFILEID\",
+									\"valor\":\"$7\"
 								}
 							]
-						},"
+						}"
 	fi
 	
 #	Se HSS_N nao estiver vazia, escrever o bloco com HSS_N.
 	testa_HSS_N=""
 	testa_HSS_N=$8
 	if [ -n "$testa_HSS_N" ]; then
-		json+="	
+		json+=",
                         {
-                           "servico":{
-                              "id":"HSS"
+                           \"servico\":{
+                              \"id\":\"HSS\"
                            },
-                           "operacao":{
-                              "id":"ACT"
+                           \"operacao\":{
+                              \"id\":\"ACT\"
                            }
-                        },"
+                        }"
 	fi
 	
 #	Se HSS_P nao estiver vazia, escrever o bloco com HSS_P.
 	testa_HSS_P=""
 	testa_HSS_P=$9
 	if [ -n "$testa_HSS_P" ]; then
-		json+="	
+		json+=",
                         {
-                           "servico":{
-                              "id":"HSS"
+                           \"servico\":{
+                              \"id\":\"HSS\"
                            },
-                           "operacao":{
-                              "id":"CAN"
+                           \"operacao\":{
+                              \"id\":\"CAN\"
                            }
-                        },"
+                        }"
 	fi
 
 #	Se _5GNSA_N nao estiver vazia, escrever o bloco com 5GNSA.
 	testa_5GNSA_N=""
 	testa_5GNSA_N=${10}
 	if [ -n "$testa_5GNSA_N" ]; then
-		json+="	
+		json+=",
                         {
-                           "servico":{
-                              "id":"5GNSA"
+                           \"servico\":{
+                              \"id\":\"5GNSA\"
                            },
-                           "operacao":{
-                              "id":"ACT"
+                           \"operacao\":{
+                              \"id\":\"ACT\"
                            }
-                        },"
+                        }"
 	fi
 
 #	Se _5GNSA_P nao estiver vazia, escrever o bloco com 5GNSA.
 	testa_5GNSA_P=""
 	testa_5GNSA_P=${11}
 	if [ -n "$testa_5GNSA_P" ]; then
-		json+="	
+		json+=",
                         {
-                           "servico":{
-                              "id":"5GNSA"
+                           \"servico\":{
+                              \"id\":\"5GNSA\"
                            },
-                           "operacao":{
-                              "id":"CAN"
+                           \"operacao\":{
+                              \"id\":\"CAN\"
                            }
-                        },"
+                        }"
 	fi
 
 #	Se _5GSA_N nao estiver vazia, escrever o bloco com 5GSA.
 	testa_5GSA_N=""
 	testa_5GSA_N=${12}
 	if [ -n "$testa_5GSA_N" ]; then
-		json+="	
+		json+=",
                         {
-                           "servico":{
-                              "id":"5GSA"
+                           \"servico\":{
+                              \"id\":\"5GSA\"
                            },
-                           "operacao":{
-                              "id":"ACT"
+                           \"operacao\":{
+                              \"id\":\"ACT\"
                            }
-                        },"
+                        }"
 	fi
 
 #	Se _5GSA_P nao estiver vazia, escrever o bloco com 5GSA.
 	testa_5GSA_P=""
 	testa_5GSA_P=${13}
 	if [ -n "$testa_5GSA_P" ]; then
-		json+="	
+		json+=",
                         {
-                           "servico":{
-                              "id":"5GSA"
+                           \"servico\":{
+                              \"id\":\"5GSA\"
                            },
-                           "operacao":{
-                              "id":"CAN"
+                           \"operacao\":{
+                              \"id\":\"CAN\"
                            }
-                        },"
+                        }"
 	fi
-
+	
+	
+	
+	
 	echo "$json"
-	# Essa chave fecha o escreve_json
+}	# Essa chave fecha o escreve_json
+
+#--------------------------------------------------------------------------------------------
+
+escreve_json_slice(){
+#	$1 -> slice_name
+#	$2 -> slice_id
+#	$3 -> slice_default
+
+
+#	Se slice_name nao estiver vazia, escrever o bloco com SLICE.
+	testa_slice=""
+	testa_slice_name=$1
+	if [ -n "$testa_name" ]; then
+		json_slice= ",
+							{
+								"servico":{
+									"id":"$1"
+								},
+								"operacao":{
+									"id":"-----------AJUSTAR PARA ACT OU CAN-----------"
+								},
+								"parametro":[
+									{
+										"nome":"SLICEID",
+										"valor":"$2"
+									},
+									{
+										"nome":"DEFAULT",
+										"valor":"$3"
+									}
+								]
+							}"
+	fi
+}
+
+
+#--------------------------------------------------------------------------------------------
+
+fecha_json(){
+	final="
+							]
+						}
+					}
+				}
+			}
+		]
+	}
+}"
+	echo $final
 }
 
 # ------------------------------------------------------------------------ #
@@ -582,43 +683,52 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		HLR_P=$(extrai_HLR "$lst_feature_prev")
 		profile_N=$(extrai_profile "$lst_feature")
 		profile_P=$(extrai_profile "$lst_feature_prev")
-		
-		
 		HSS_N=$(possui_feature "$lst_feature" "=HSS;")
 		HSS_P=$(possui_feature "$lst_feature_prev" "=HSS;")
-		
 		_5GNSA_N=$(possui_feature "$lst_feature" "=5GNSA;")
 		_5GNSA_P=$(possui_feature "$lst_feature_prev" "=5GNSA;")
-		
 		_5GSA_N=$(possui_feature "$lst_feature" "=5GSA;")
 		_5GSA_P=$(possui_feature "$lst_feature_prev" "=5GSA;")
 		
+		#Tratamento de slices
+		slice_N=$(extrai_slice "$lst_feature")
+		slice_P=$(extrai_slice "$lst_feature_prev")
+		
 		echo "------------------------"
 		echo $nome_arquivo
-		echo "REQ_ID: $req_id"
-		echo "Acao: $acao"
-		echo "Telefone: $telefone"
-		echo "IMSI: $imsi"
-		echo "HLR_N: $HLR_N"
-		echo "HLR_P: $HLR_P"
-		echo "profile_N: $profile_N"
-		echo "profile_P: $profile_P"
-		echo "HSS_N:----$HSS_N"
-		echo "HSS_P:----$HSS_P"
-		echo "5GNSA_N:--$_5GNSA_N"
-		echo "5GNSA_P:--$_5GNSA_P"
-		echo "5GSA_N:---$_5GSA_N"
-		echo "5GSA_P:---$_5GSA_P"
+#		echo "REQ_ID: $req_id"
+#		echo "Acao: $acao"
+#		echo "Telefone: $telefone"
+#		echo "IMSI: $imsi"
+#		echo "HLR_N: $HLR_N"
+#		echo "HLR_P: $HLR_P"
+#		echo "profile_N: $profile_N"
+#		echo "profile_P: $profile_P"
+#		echo "HSS_N:----$HSS_N"
+#		echo "HSS_P:----$HSS_P"
+#		echo "5GNSA_N:--$_5GNSA_N"
+#		echo "5GNSA_P:--$_5GNSA_P"
+#		echo "5GSA_N:---$_5GSA_N"
+#		echo "5GSA_P:---$_5GSA_P"
+		echo "SLICE_N: $slice_N"
+		echo "SLICE_P: $slice_P"
+
+
 #		echo "------------------------"
 #		echo "lst_feature: $lst_feature"
 #		echo "------------------------"
 #		echo "lst_feature_prev: $lst_feature_prev"
 #		echo "------------------------"
 
-		#Funcao 	 $1		  $2	  $3		  $4	   $5		$6			 $7			  $8	   $9		${10}		${11}		${12}	   ${13}
-		escreve_json $req_id "$acao" "$telefone" "$HLR_N" "$HLR_P" "$profile_N" "$profile_P" "$HSS_N" "$HSS_P" "$_5GNSA_N" "$_5GNSA_P" "$_5GSA_N" "$_5GSA_P" > $arquivo_destino
-		                                                                                       
-		# Adicionar json+= para HSS 5GNSA e 5GSA                                               
+		#Funcao1 	  $1		$2		$3			$4		 $5		  $6		   $7			$8		 $9		  ${10}		  ${11}		  ${12}		 ${13}
+		escreve_json "$req_id" "$acao" "$telefone" "$HLR_N" "$HLR_P" "$profile_N" "$profile_P" "$HSS_N" "$HSS_P" "$_5GNSA_N" "$_5GNSA_P" "$_5GSA_N" "$_5GSA_P" > $arquivo_destino
+		
+		#Funcao2	   $1
+#		escreve_json2 "CONCATENA" >> $arquivo_destino
+		
+		#Funcao3
+		fecha_json >> $arquivo_destino
+
 		                                                                                       
     	fi
 done
@@ -627,3 +737,6 @@ echo "Processo concluido"
 
 
 # ------------------------------------------------------------------------ #
+
+# Perguntar para a Carina a quantidade MAXIMA DE SLICES DNNS E APNS EM CADA OS
+#													2	4		4 -> O QUE ESTAVA NOS TESTES
