@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #
+# ------------------------------------------------------------------------ #
 # geraJSON - 	Transforma um teste que insere na sps_solicitacao em 
 #				teste de interface
 # Autor:      Rafael Oliveira
@@ -28,25 +29,33 @@
 #   v1.4 20/09/2023, Rafael:
 #       - Corrigido o bug do HLR_P inexistente
 #		- Adicionado extrai_profile
-#   v1.4 20/09/2023, Rafael:
+#   v1.5 20/09/2023, Rafael:
 #       - Adicionado funcao possui_feature
-#   v1.5 21/09/2023, Rafael:
-#       - Adicionado tratamento para HSS, 5GNSA e 5GSA
 #   v1.6 21/09/2023, Rafael:
+#       - Adicionado tratamento para HSS, 5GNSA e 5GSA
+#   v1.7 21/09/2023, Rafael:
 #       - Ajustado as aspas do json de saida
 #		- Adicionado escreve_json2 para tratar as features SLICE, DNN e APN
-#   v1.6 25/09/2023, Rafael:
+#   v1.8 25/09/2023, Rafael:
 #		- Ajustado bug das virgulas no json
+#   v1.9 26/09/2023, Rafael:
+#		- Ajustado extrai_slice para até 2 slices
+#		- Criado escreve_slice_json
+#		- Criado tratamento para iccid
+#		- Adicionado imsi e iccid no json
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
 # ------------------------------------------------------------------------ #
-
-# ----------------------- MELHORIAS A SEREM FEITAS------------------------ #
+#
+# -------------- MELHORIAS A SEREM FEITAS PARA geraJSON_2.0 -------------- #
 #	- Criar uma função unica para testar a existencia do arquivo 
 #	e testar apenas uma vez para cada arquivo.
+#	- Melhorar a funcao extrai_slice para que o numero de slices seja
+#	dinamico invés de no maximo 2. Tambem alterar a forma que o JSON
+#	recebe essa informacao.
 # ------------------------------------------------------------------------ #
-
+#
 # ------------------------------- VARIAVEIS ------------------------------ #
 
 # Diretorio onde estao os arquivos
@@ -71,20 +80,8 @@ lst_feature_prev=""
 # ------------------------------- FUNCOES -------------------------------- #
 
 extrai_req_id(){
-        # Verifica se foi fornecido o nome do arquivo como argumento
-        if [ $# -ne 1 ]; then
-                echo "Uso: $0 <arquivo>"
-                exit 1
-        fi
-
         # Le o nome do arquivo a partir do primeiro argumento
         arquivo="$1"
-
-        # Verifica se o arquivo existe
-        if [ ! -e "$arquivo" ]; then
-                echo "O arquivo '$arquivo' nao existe."
-                exit 1
-        fi
 
         # Extrai a linha com "values" ou "VALUES" do arquivo e a armazena na variavel "linha"
         linha=$(grep -i 'values' "$arquivo")
@@ -108,20 +105,8 @@ extrai_req_id(){
 # ------------------------------------------------------------------------ #
 
 extrai_telefone(){
-        # Verifica se foi fornecido o nome do arquivo como argumento
-        if [ $# -ne 1 ]; then
-                echo "Uso: $0 <arquivo>"
-                exit 1
-        fi
-
         # Le o nome do arquivo a partir do primeiro argumento
         arquivo="$1"
-
-        # Verifica se o arquivo existe
-        if [ ! -e "$arquivo" ]; then
-                echo "O arquivo '$arquivo' nao existe."
-                exit 1
-        fi
 
         # Extrai a linha com "values" ou "VALUES" do arquivo e a armazena na variavel "linha"
         linha=$(grep -i 'values' "$arquivo")
@@ -145,20 +130,8 @@ extrai_telefone(){
 # ------------------------------------------------------------------------ #
 
 extrai_imsi(){
-        # Verifica se foi fornecido o nome do arquivo como argumento
-        if [ $# -ne 1 ]; then
-                echo "Uso: $0 <arquivo>"
-                exit 1
-        fi
-
         # Le o nome do arquivo a partir do primeiro argumento
         arquivo="$1"
-
-        # Verifica se o arquivo existe
-        if [ ! -e "$arquivo" ]; then
-                echo "O arquivo '$arquivo' nao existe."
-                exit 1
-        fi
 
         # Extrai a linha com "values" ou "VALUES" do arquivo e a armazena na variavel "linha"
         linha=$(grep -i 'values' "$arquivo")
@@ -173,11 +146,18 @@ extrai_imsi(){
         imsi=$(echo "$linha" | cut -d ',' -f 59)
 
         #Remove as aspas
-#        imsi="${imsi#?}"
-#        imsi="${imsi%?}"
+        imsi="${imsi#?}"
+        imsi="${imsi%?}"
 
         #Imprime o numero do imsi
         echo "$imsi"
+}
+# ------------------------------------------------------------------------ #
+
+extrai_iccid(){
+	iccid=$(extrai_feature "$1" "ICCID=")
+	echo $iccid
+
 }
 # ------------------------------------------------------------------------ #
 
@@ -212,41 +192,29 @@ extrai_slice(){
 	slice=$(possui_feature "$lista_feature" "=SLICE")
 	
 	# Seleciona os slices da lst_feature(_prev)
-	lista_slice=$(echo "$slice" | cut -c7-14)
+	#lista_slice=$(echo "$slice" | cut -c7-14)
 	
 	#Conta o numero de slices
-	num_slices=$(echo "$lista_slice" | wc -w | awk '{print $1}')
+	#num_slices=$(echo "$lista_slice" | wc -w | awk '{print $1}')
 	
 	slice_name=$(echo "$slice" | cut -c7-14)
 	slice_id=$(echo "$slice" | cut -c37-37)
 	slice_default=$(extrai_feature "$slice" "DEFAULT=")
 	
+	slice_name_1=$(echo -e "$slice_name" | head -n 1)
+	slice_name_2=$(echo -e "$slice_name" | sed -n '2p')
+	slice_id_1=$(echo -e "$slice_id" | head -n 1)
+	slice_id_2=$(echo -e "$slice_id" | sed -n '2p')
+	slice_default_1=$(echo -e "$slice_default" | head -n 1)
+	slice_default_2=$(echo -e "$slice_default" | sed -n '2p')
 	
-	# Separar os valores das variáveis
-	IFS=' ' read -ra slice_name_values <<< "$slice_name"
-	resultado1_slice_name="${slice_name_values[0]}"
-	resultado2_slice_name="${slice_name_values[1]}"
-	
-	IFS=' ' read -ra slice_id_values <<< "$slice_id"
-	resultado1_slice_id="${slice_id_values[0]}"
-	resultado2_slice_id="${slice_id_values[1]}"
-	
-	IFS=' ' read -ra slice_default_values <<< "$slice_default"
-	resultado1_slice_default="${slice_default_values[0]}"
-	resultado2_slice_default="${slice_default_values[1]}"
-	
-	# Imprimir os resultados
-	echo "Resultado 1 de slice_name: $resultado1_slice_name"
-	echo "Resultado 1 de slice_id: $resultado1_slice_id"
-	echo "Resultado 1 de slice_default: $resultado1_slice_default"
-
-	echo "Resultado 2 de slice_name: $resultado2_slice_name"
-	echo "Resultado 2 de slice_id: $resultado2_slice_id"
-	echo "Resultado 2 de slice_default: $resultado2_slice_default"
-	
-#	echo $slice_name
-#	echo $slice_id
-#	echo $slice_default
+	# Exibir as duas palavras
+	echo "$slice_name_1"
+	echo "$slice_name_2"
+	echo "$slice_id_1"
+	echo "$slice_id_2"
+	echo "$slice_default_1"
+	echo "$slice_default_2"
 	
 }
 
@@ -350,19 +318,20 @@ escreve_json(){
 #	$1 -> req_id
 #	$2 -> acao
 #	$3 -> telefone
-#	$4 -> HLR_N
-#	$5 -> HLR_P
-#	$6 -> profile_N
-#	$7 -> profine_P
-#	$8 -> $HSS_N
-#	$9 -> $HSS_P
-#	$10-> $_5GNSA_N
-#	$11-> $_5GNSA_P
-#	$12-> $_5GSA_N
-#	$13-> $_5GSA_P
+#	$4 -> iccid
+#	$5 -> imsi
+#	$6 -> HLR_N
+#	$7 -> HLR_P
+#	$8 -> profile_N
+#	$9 -> profine_P
+#	$10 -> $HSS_N
+#	$11 -> $HSS_P
+#	$12-> $_5GNSA_N
+#	$13-> $_5GNSA_P
+#	$14-> $_5GSA_N
+#	$15-> $_5GSA_P
 
-	local json="
-{
+	local json="{
    \"ordem\":{
       \"correlacao\":[
          {
@@ -397,8 +366,8 @@ escreve_json(){
                      \"numero-telefone\":\"$3\"
                   },
                   \"simcard\":{
-                     \"iccid\":\"89550031310007761975\",
-                     \"imsi\":\"724003100569646\",
+                     \"iccid\":\"$4\",
+                     \"imsi\":\"$5\",
                      \"pin\":\"3636\",
                      \"puk\":\"3636\",
                      \"pin2\":\"3636\",
@@ -421,7 +390,7 @@ escreve_json(){
                             \"parametro\": [
                                 {
                                     \"nome\": \"HLR\",
-                                    \"valor\": \"$4\"
+                                    \"valor\": \"$6\"
                                 },
                                 {
                                     \"nome\": \"HSSDRA\",
@@ -432,7 +401,7 @@ escreve_json(){
 
 #	Se HLR_P nao estiver vazia, escrever o bloco com HLR_P.
 	testa_HLR_P=""
-	testa_HLR_P=$5
+	testa_HLR_P=$7
 	if [ -n "$testa_HLR_P" ]; then
 	
 	json+=",
@@ -446,7 +415,7 @@ escreve_json(){
                             \"parametro\": [
                                 {
                                     \"nome\": \"HLR\",
-                                    \"valor\": \"$5\"
+                                    \"valor\": \"$7\"
                                 },
                                 {
                                     \"nome\": \"HSSDRA\",
@@ -458,7 +427,7 @@ escreve_json(){
 	
 #	Se profile_N nao estiver vazia, escrever o bloco com profile_N.
 	testa_profile_N=""
-	testa_profile_N=$6
+	testa_profile_N=$8
 	if [ -n "$testa_profile_N" ]; then
 		json+=",	
 						{
@@ -471,7 +440,7 @@ escreve_json(){
 							\"parametro\":[
 								{
 									\"nome\":\"PROFILEID\",
-									\"valor\":\"$6\"
+									\"valor\":\"$8\"
 								}
 							]
 						}"
@@ -479,7 +448,7 @@ escreve_json(){
 	
 #	Se profile_P nao estiver vazia, escrever o bloco com profile_P.
 	testa_profile_P=""
-	testa_profile_P=$7
+	testa_profile_P=$9
 	if [ -n "$testa_profile_P" ]; then
 		json+=",
 						{
@@ -492,7 +461,7 @@ escreve_json(){
 							\"parametro\":[
 								{
 									\"nome\":\"PROFILEID\",
-									\"valor\":\"$7\"
+									\"valor\":\"$9\"
 								}
 							]
 						}"
@@ -500,7 +469,7 @@ escreve_json(){
 	
 #	Se HSS_N nao estiver vazia, escrever o bloco com HSS_N.
 	testa_HSS_N=""
-	testa_HSS_N=$8
+	testa_HSS_N=${10}
 	if [ -n "$testa_HSS_N" ]; then
 		json+=",
                         {
@@ -515,7 +484,7 @@ escreve_json(){
 	
 #	Se HSS_P nao estiver vazia, escrever o bloco com HSS_P.
 	testa_HSS_P=""
-	testa_HSS_P=$9
+	testa_HSS_P=${11}
 	if [ -n "$testa_HSS_P" ]; then
 		json+=",
                         {
@@ -530,7 +499,7 @@ escreve_json(){
 
 #	Se _5GNSA_N nao estiver vazia, escrever o bloco com 5GNSA.
 	testa_5GNSA_N=""
-	testa_5GNSA_N=${10}
+	testa_5GNSA_N=${12}
 	if [ -n "$testa_5GNSA_N" ]; then
 		json+=",
                         {
@@ -545,7 +514,7 @@ escreve_json(){
 
 #	Se _5GNSA_P nao estiver vazia, escrever o bloco com 5GNSA.
 	testa_5GNSA_P=""
-	testa_5GNSA_P=${11}
+	testa_5GNSA_P=${13}
 	if [ -n "$testa_5GNSA_P" ]; then
 		json+=",
                         {
@@ -560,7 +529,7 @@ escreve_json(){
 
 #	Se _5GSA_N nao estiver vazia, escrever o bloco com 5GSA.
 	testa_5GSA_N=""
-	testa_5GSA_N=${12}
+	testa_5GSA_N=${14}
 	if [ -n "$testa_5GSA_N" ]; then
 		json+=",
                         {
@@ -575,7 +544,7 @@ escreve_json(){
 
 #	Se _5GSA_P nao estiver vazia, escrever o bloco com 5GSA.
 	testa_5GSA_P=""
-	testa_5GSA_P=${13}
+	testa_5GSA_P=${15}
 	if [ -n "$testa_5GSA_P" ]; then
 		json+=",
                         {
@@ -588,46 +557,129 @@ escreve_json(){
                         }"
 	fi
 	
-	
-	
-	
 	echo "$json"
 }	# Essa chave fecha o escreve_json
 
 #--------------------------------------------------------------------------------------------
 
-escreve_json_slice(){
-#	$1 -> slice_name
-#	$2 -> slice_id
-#	$3 -> slice_default
+escreve_slice_json(){
+#	$1 -> $slice_N_name_1
+#	$2 -> $slice_N_id_1
+#	$3 -> $slice_N_default_1
+#	$4 -> $slice_N_name_2
+#	$5 -> $slice_N_id_2
+#	$6 -> $slice_N_default_2
+#	$7 -> $slice_P_name_1
+#	$8 -> $slice_P_id_1
+#	$9-> $slice_P_default_1
+#	$10 -> $slice_P_name_2
+#	$11-> $slice_P_id_2
+#	$12-> $slice_P_default_2
 
+json_slice=""
 
-#	Se slice_name nao estiver vazia, escrever o bloco com SLICE.
-	testa_slice=""
-	testa_slice_name=$1
-	if [ -n "$testa_name" ]; then
-		json_slice= ",
+#	Se slice_N_name_1 nao estiver vazia, escrever o bloco com SLICE.
+	testa_slice_N_1=""
+	testa_slice_N_1=$1
+	if [ -n "$testa_slice_N_1" ]; then
+		json_slice+=",
 							{
-								"servico":{
-									"id":"$1"
+								\"servico\":{
+									\"id\":\"$1\"
 								},
-								"operacao":{
-									"id":"-----------AJUSTAR PARA ACT OU CAN-----------"
+								\"operacao\":{
+									\"id\":\"ACT\"
 								},
-								"parametro":[
+								\"parametro\":[
 									{
-										"nome":"SLICEID",
-										"valor":"$2"
+										\"nome\":\"SLICEID\",
+										\"valor\":\"$2\"
 									},
 									{
-										"nome":"DEFAULT",
-										"valor":"$3"
+										\"nome\":\"DEFAULT\",
+										\"valor\":\"$3\"
 									}
 								]
 							}"
 	fi
-}
-
+	
+#	Se slice_N_name_2 nao estiver vazia, escrever o bloco com SLICE.
+	testa_slice_N_2=""
+	testa_slice_N_2=$4
+	if [ -n "$testa_slice_N_2" ]; then
+		json_slice+=",
+							{
+								\"servico\":{
+									\"id\":\"$4\"
+								},
+								\"operacao\":{
+									\"id\":\"ACT\"
+								},
+								\"parametro\":[
+									{
+										\"nome\":\"SLICEID\",
+										\"valor\":\"$5\"
+									},
+									{
+										\"nome\":\"DEFAULT\",
+										\"valor\":\"$6\"
+									}
+								]
+							}"
+	fi
+	
+#	Se slice_P_name_1 nao estiver vazia, escrever o bloco com SLICE.
+	testa_slice_P_1=""
+	testa_slice_P_1=$7
+	if [ -n "$testa_slice_P_1" ]; then
+		json_slice+=",
+							{
+								\"servico\":{
+									\"id\":\"$7\"
+								},
+								\"operacao\":{
+									\"id\":\"CAN\"
+								},
+								\"parametro\":[
+									{
+										\"nome\":\"SLICEID\",
+										\"valor\":\"$8\"
+									},
+									{
+										\"nome\":\"DEFAULT\",
+										\"valor\":\"$9\"
+									}
+								]
+							}"
+	fi
+	
+#	Se slice_P_name_2 nao estiver vazia, escrever o bloco com SLICE.
+	testa_slice_P_2=""
+	testa_slice_P_2=${10}
+	if [ -n "$testa_slice_P_2" ]; then
+		json_slice+=",
+							{
+								\"servico\":{
+									\"id\":\"${10}\"
+								},
+								\"operacao\":{
+									\"id\":\"CAN\"
+								},
+								\"parametro\":[
+									{
+										\"nome\":\"SLICEID\",
+										\"valor\":\"${11}\"
+									},
+									{
+										\"nome\":\"DEFAULT\",
+										\"valor\":\"${12}\"
+									}
+								]
+							}"
+	fi
+	
+	echo "$json_slice"
+}	# Essa chave fecha o escreve_slice_json
 
 #--------------------------------------------------------------------------------------------
 
@@ -677,7 +729,7 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		req_id=$(extrai_req_id "$arquivo_origem")
 		telefone=$(extrai_telefone "$arquivo_origem")
 		imsi=$(extrai_imsi "$arquivo_origem")
-		
+		iccid=$(extrai_iccid "$lst_feature")
 		acao=$(extrai_acao "$lst_feature")
 		HLR_N=$(extrai_HLR "$lst_feature")
 		HLR_P=$(extrai_HLR "$lst_feature_prev")
@@ -689,17 +741,49 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		_5GNSA_P=$(possui_feature "$lst_feature_prev" "=5GNSA;")
 		_5GSA_N=$(possui_feature "$lst_feature" "=5GSA;")
 		_5GSA_P=$(possui_feature "$lst_feature_prev" "=5GSA;")
-		
-		#Tratamento de slices
 		slice_N=$(extrai_slice "$lst_feature")
+		slice_N_name_1=$(echo "$slice_N" | sed -n '1p')
+		slice_N_name_2=$(echo "$slice_N" | sed -n '2p')
+		slice_N_id_1=$(echo "$slice_N" | sed -n '3p')
+		slice_N_id_2=$(echo "$slice_N" | sed -n '4p')
+		slice_N_default_1=$(echo "$slice_N" | sed -n '5p')
+		slice_N_default_2=$(echo "$slice_N" | sed -n '6p')
 		slice_P=$(extrai_slice "$lst_feature_prev")
-		
+		slice_P_name_1=$(echo "$slice_P" | sed -n '1p')
+		slice_P_name_2=$(echo "$slice_P" | sed -n '2p')
+		slice_P_id_1=$(echo "$slice_P" | sed -n '3p')
+		slice_P_id_2=$(echo "$slice_P" | sed -n '4p')
+		slice_P_default_1=$(echo "$slice_P" | sed -n '5p')
+		slice_P_default_2=$(echo "$slice_P" | sed -n '6p')
+
+#######	TESTE SLICE
+#		if [ "$nome_arquivo" = "T0090_009" ]; then
+#			echo "$nome_arquivo"
+#			echo "slice N"
+#			echo "$slice_N_name_1"
+#			echo "$slice_N_name_2"
+#			echo "$slice_N_id_1"
+#			echo "$slice_N_id_2"
+#			echo "$slice_N_default_1"
+#			echo "$slice_N_default_2"
+#			
+#			echo "slice P"
+#			echo "$slice_P_name_1"
+#			echo "$slice_P_name_2"
+#			echo "$slice_P_id_1"
+#			echo "$slice_P_id_2"
+#			echo "$slice_P_default_1"
+#			echo "$slice_P_default_2"
+#		fi
+########
+				
 		echo "------------------------"
-		echo $nome_arquivo
+		echo "$nome_arquivo"
 #		echo "REQ_ID: $req_id"
 #		echo "Acao: $acao"
 #		echo "Telefone: $telefone"
 #		echo "IMSI: $imsi"
+#		echo "ICCID: $iccid"
 #		echo "HLR_N: $HLR_N"
 #		echo "HLR_P: $HLR_P"
 #		echo "profile_N: $profile_N"
@@ -710,33 +794,33 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 #		echo "5GNSA_P:--$_5GNSA_P"
 #		echo "5GSA_N:---$_5GSA_N"
 #		echo "5GSA_P:---$_5GSA_P"
-		echo "SLICE_N: $slice_N"
-		echo "SLICE_P: $slice_P"
-
-
+#		echo "SLICE_N: $slice_N"
+#		echo "SLICE_P: $slice_P"
 #		echo "------------------------"
 #		echo "lst_feature: $lst_feature"
 #		echo "------------------------"
 #		echo "lst_feature_prev: $lst_feature_prev"
 #		echo "------------------------"
 
-		#Funcao1 	  $1		$2		$3			$4		 $5		  $6		   $7			$8		 $9		  ${10}		  ${11}		  ${12}		 ${13}
-		escreve_json "$req_id" "$acao" "$telefone" "$HLR_N" "$HLR_P" "$profile_N" "$profile_P" "$HSS_N" "$HSS_P" "$_5GNSA_N" "$_5GNSA_P" "$_5GSA_N" "$_5GSA_P" > $arquivo_destino
+		#Funcao1 	  $1		$2		$3			$4		 $5		 $6		  $7	   $8			$9			 ${10}	  ${11}	   ${12}	   ${13}	   ${14}	  ${15}
+		escreve_json "$req_id" "$acao" "$telefone" "$iccid" "$imsi" "$HLR_N" "$HLR_P" "$profile_N" "$profile_P" "$HSS_N" "$HSS_P" "$_5GNSA_N" "$_5GNSA_P" "$_5GSA_N" "$_5GSA_P"  > $arquivo_destino
 		
-		#Funcao2	   $1
-#		escreve_json2 "CONCATENA" >> $arquivo_destino
-		
-		#Funcao3
-		fecha_json >> $arquivo_destino
+		#Funcao2	 	  	$1				  $2			  $3				   $4				 $5			     $6					  $7				$8				$9					 ${10}			   ${11}		   ${12}
+		escreve_slice_json "$slice_N_name_1" "$slice_N_id_1" "$slice_N_default_1" "$slice_N_name_2" "$slice_N_id_2" "$slice_N_default_2" "$slice_P_name_1" "$slice_P_id_1" "$slice_P_default_1" "$slice_P_name_2" "$slice_P_id_2" "$slice_P_default_2" >> $arquivo_destino
 
-		                                                                                       
-    	fi
+		#Funcao3
+#		escreve_dnn_json
+		
+		#Funcao4
+#		escreve_apn_json
+
+		#Funcao5
+		fecha_json >> $arquivo_destino
+		
+    fi
 done
 
+echo "------------------------"
 echo "Processo concluido"
 
-
 # ------------------------------------------------------------------------ #
-
-# Perguntar para a Carina a quantidade MAXIMA DE SLICES DNNS E APNS EM CADA OS
-#													2	4		4 -> O QUE ESTAVA NOS TESTES
