@@ -43,6 +43,10 @@
 #		- Criado escreve_slice_json
 #		- Criado tratamento para iccid
 #		- Adicionado imsi e iccid no json
+#	v1.10 26/09/2023, Rafael:
+#		- Ajustado a organizacao dos campos slice
+#		- Criado extrai_dnn
+#		- Adicionado chamada ao escreve_dnn_json
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
@@ -185,7 +189,7 @@ extrai_profile(){
 }
 
 # ------------------------------------------------------------------------ #
-	
+
 extrai_slice(){
 	# $1 -> lst_feature(_prev)
 	lista_feature=$1
@@ -195,8 +199,8 @@ extrai_slice(){
 	#lista_slice=$(echo "$slice" | cut -c7-14)
 	
 	#Conta o numero de slices
-	#num_slices=$(echo "$lista_slice" | wc -w | awk '{print $1}')
-	
+	num_dnn=$(echo "$lista_slice" | grep -o "=SLICE" | wc -l)
+
 	slice_name=$(echo "$slice" | cut -c7-14)
 	slice_id=$(echo "$slice" | cut -c37-37)
 	slice_default=$(extrai_feature "$slice" "DEFAULT=")
@@ -208,14 +212,65 @@ extrai_slice(){
 	slice_default_1=$(echo -e "$slice_default" | head -n 1)
 	slice_default_2=$(echo -e "$slice_default" | sed -n '2p')
 	
-	# Exibir as duas palavras
 	echo "$slice_name_1"
-	echo "$slice_name_2"
 	echo "$slice_id_1"
-	echo "$slice_id_2"
 	echo "$slice_default_1"
+	echo "$slice_name_2"
+	echo "$slice_id_2"
 	echo "$slice_default_2"
+}
+
+# ------------------------------------------------------------------------ #
+
+extrai_dnn(){
+	# $1 -> lst_feature(_prev)
+	lista_feature=$1
+	lista_dnn=$(possui_feature "$lista_feature" "=DNN")
 	
+	# Seleciona as DNN da lst_feature(_prev)
+	#lista_dnn=$(echo "$dnn" | cut -c7-14)
+	
+	#Conta o numero de dnn
+	num_dnn=$(echo "$lista_dnn" | grep -o "=DNN" | wc -l)
+	contador=1
+	limite=($num_dnn)
+	((limite++))
+	declare -a dnn
+	
+	echo "$num_dnn"
+	while [ "$contador" -lt "$limite" ]; do
+
+		linha=$(echo "$lista_dnn" | sed -n "${contador}p")
+		
+		dnn=$(extrai_feature "$linha" "FTRCD=")
+		dnn_id=$(extrai_feature "$linha" "DNNID=")
+		dnn_name=$(extrai_feature "$linha" "DNNNAME=")
+		dnn_eqosid=$(extrai_feature "$linha" "EQOSID=")
+		dnn_ip=$(extrai_feature "$linha" "TIPOIP=")
+		dnn_ipv4=$(extrai_feature "$linha" "IPV4=")
+		dnn_ipv6=$(extrai_feature "$linha" "IPV6=")
+		dnn_default=$(extrai_feature "$linha" "DEFAULT=")
+		dnn_sliceid=$(extrai_feature "$linha" "SLICEID=")
+		
+		echo "$dnn"
+		echo "$dnn_id"
+		echo "$dnn_name"
+		echo "$dnn_eqosid"
+		echo "$dnn_ip"
+		echo "$dnn_ipv4"
+		echo "$dnn_ipv6"
+		echo "$dnn_default"
+		echo "$dnn_sliceid"
+
+		((contador++))
+	done
+	
+#	echo "Quantidade de DNNs: $num_dnn"
+#	echo "--- Lista DNN ---"
+#	echo "$lista_dnn"
+#	echo "-----------------"
+#	echo "$num_dnn"
+
 }
 
 # ------------------------------------------------------------------------ #
@@ -274,8 +329,8 @@ extrai_lst_feature_prev() {
 # ------------------------------------------------------------------------ #
 
 possui_feature(){
-	# $1 -> lst_feature(_prev)
-	# $2 -> HSS, 5GNSA ou 5GSA
+	# $1 -> $lst_feature(_prev)
+	# $2 -> $HSS, $5GNSA ou $5GSA
 	lista_feature=$1
 	feature=$2
 	
@@ -293,8 +348,8 @@ possui_feature(){
 # ------------------------------------------------------------------------ #
 
 extrai_feature(){
-#	$1 -> lst_feature(_prev)
-#	$2 -> feature (HLR, acao)
+#	$1 -> $lst_feature(_prev)
+#	$2 -> $feature (HLR, acao)
 	lista_feature=$1
 	feature=$2
 	
@@ -315,17 +370,17 @@ extrai_feature(){
 # ------------------------------------------------------------------------ #
 
 escreve_json(){
-#	$1 -> req_id
-#	$2 -> acao
-#	$3 -> telefone
-#	$4 -> iccid
-#	$5 -> imsi
-#	$6 -> HLR_N
-#	$7 -> HLR_P
-#	$8 -> profile_N
-#	$9 -> profine_P
-#	$10 -> $HSS_N
-#	$11 -> $HSS_P
+#	$1 -> $req_id
+#	$2 -> $acao
+#	$3 -> $telefone
+#	$4 -> $iccid
+#	$5 -> $imsi
+#	$6 -> $HLR_N
+#	$7 -> $HLR_P
+#	$8 -> $profile_N
+#	$9 -> $profine_P
+#	$10-> $HSS_N
+#	$11-> $HSS_P
 #	$12-> $_5GNSA_N
 #	$13-> $_5GNSA_P
 #	$14-> $_5GSA_N
@@ -571,8 +626,8 @@ escreve_slice_json(){
 #	$6 -> $slice_N_default_2
 #	$7 -> $slice_P_name_1
 #	$8 -> $slice_P_id_1
-#	$9-> $slice_P_default_1
-#	$10 -> $slice_P_name_2
+#	$9->  $slice_P_default_1
+#	$10 ->$slice_P_name_2
 #	$11-> $slice_P_id_2
 #	$12-> $slice_P_default_2
 
@@ -683,6 +738,71 @@ json_slice=""
 
 #--------------------------------------------------------------------------------------------
 
+escreve_dnn_json(){
+#	$1  -> $ddn_N
+#	$2	-> $ddn_P
+	
+	dnn_N=$1
+	dnn_P=$2
+	
+	dnn_N_qtd=$(echo "$dnn_N" | sed -n '1p')
+
+	echo "$dnn_N_qtd"
+	
+	
+	dnn_json=""
+	dnn_json+=",
+                        {
+                            "servico":{
+                                "id":"DNN001"
+                            },
+                            "operacao":{
+                                "id":"ACT"
+                            },
+                            "parametro":[
+                                {
+                                    "nome":"DNNID",
+                                    "valor":"1"
+                                },
+                                {
+                                    "nome":"DNNNAME",
+                                    "valor":"teste.com.br"
+                                },
+                                {
+                                    "nome":"EQOSID",
+                                    "valor":"2"
+                                },
+                                {
+                                    "nome":"SCHAR",
+                                    "valor":"1"
+                                },
+                                {
+                                    "nome":"TIPOIP",
+                                    "valor":"FIX" 
+                                },
+                                {
+                                    "nome":"IPV4",
+                                    "valor":"172.0.0.1"
+                                },
+                                {
+                                    "nome":"IPV6",
+                                    "valor":"2001.db8:abcf:0012::/64"
+                                },
+                                {
+                                    "nome":"DEFAULT",
+                                    "valor":"TRUE"
+                                },
+                                {
+                                    "nome":"SLICEID",
+                                    "valor":"1"
+                                }
+                            ]
+                        }"
+	
+}	# Essa chave fecha o escreve_dnn_json
+
+#--------------------------------------------------------------------------------------------
+
 fecha_json(){
 	final="
 							]
@@ -743,42 +863,29 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		_5GSA_P=$(possui_feature "$lst_feature_prev" "=5GSA;")
 		slice_N=$(extrai_slice "$lst_feature")
 		slice_N_name_1=$(echo "$slice_N" | sed -n '1p')
-		slice_N_name_2=$(echo "$slice_N" | sed -n '2p')
-		slice_N_id_1=$(echo "$slice_N" | sed -n '3p')
-		slice_N_id_2=$(echo "$slice_N" | sed -n '4p')
-		slice_N_default_1=$(echo "$slice_N" | sed -n '5p')
+		slice_N_id_1=$(echo "$slice_N" | sed -n '2p')
+		slice_N_default_1=$(echo "$slice_N" | sed -n '3p')
+		slice_N_name_2=$(echo "$slice_N" | sed -n '4p')
+		slice_N_id_2=$(echo "$slice_N" | sed -n '5p')
 		slice_N_default_2=$(echo "$slice_N" | sed -n '6p')
 		slice_P=$(extrai_slice "$lst_feature_prev")
 		slice_P_name_1=$(echo "$slice_P" | sed -n '1p')
-		slice_P_name_2=$(echo "$slice_P" | sed -n '2p')
-		slice_P_id_1=$(echo "$slice_P" | sed -n '3p')
-		slice_P_id_2=$(echo "$slice_P" | sed -n '4p')
-		slice_P_default_1=$(echo "$slice_P" | sed -n '5p')
+		slice_P_id_1=$(echo "$slice_P" | sed -n '2p')
+		slice_P_default_1=$(echo "$slice_P" | sed -n '3p')
+		slice_P_name_2=$(echo "$slice_P" | sed -n '4p')
+		slice_P_id_2=$(echo "$slice_P" | sed -n '5p')
 		slice_P_default_2=$(echo "$slice_P" | sed -n '6p')
-
-#######	TESTE SLICE
-#		if [ "$nome_arquivo" = "T0090_009" ]; then
-#			echo "$nome_arquivo"
-#			echo "slice N"
-#			echo "$slice_N_name_1"
-#			echo "$slice_N_name_2"
-#			echo "$slice_N_id_1"
-#			echo "$slice_N_id_2"
-#			echo "$slice_N_default_1"
-#			echo "$slice_N_default_2"
-#			
-#			echo "slice P"
-#			echo "$slice_P_name_1"
-#			echo "$slice_P_name_2"
-#			echo "$slice_P_id_1"
-#			echo "$slice_P_id_2"
-#			echo "$slice_P_default_1"
-#			echo "$slice_P_default_2"
-#		fi
-########
-				
-		echo "------------------------"
-		echo "$nome_arquivo"
+		#--
+		dnn_N=$(extrai_dnn "$lst_feature")
+		dnn_P=$(extrai_dnn "$lst_feature_prev")
+		#--
+		dnn_N_qtd=$(echo "$dnn_N" | sed -n '1p')
+		
+		
+		
+		
+#		echo "------------------------"
+#		echo "$nome_arquivo"
 #		echo "REQ_ID: $req_id"
 #		echo "Acao: $acao"
 #		echo "Telefone: $telefone"
@@ -796,6 +903,18 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 #		echo "5GSA_P:---$_5GSA_P"
 #		echo "SLICE_N: $slice_N"
 #		echo "SLICE_P: $slice_P"
+#		if [ "$nome_arquivo" = "T0090_009" ]; then
+			echo "----------------------------------------$nome_arquivo----------------------------------------$"
+#			echo "slice N: $slice_N_name_1 $slice_N_id_1 $slice_N_default_1 / $slice_N_name_2 $slice_N_id_2 $slice_N_default_2"
+#			echo "slice P: $slice_P_name_1 $slice_P_id_1 $slice_P_default_1 / $slice_P_name_2 $slice_P_id_2 $slice_P_default_2"
+#			echo "$dnn_N"
+			echo "$dnn_P"
+#			echo "DNN N: $ddn_N"
+#			echo "DNN P: $ddn_P"
+#		fi
+#		echo "$dnn_N_qtd"
+
+
 #		echo "------------------------"
 #		echo "lst_feature: $lst_feature"
 #		echo "------------------------"
@@ -809,7 +928,11 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		escreve_slice_json "$slice_N_name_1" "$slice_N_id_1" "$slice_N_default_1" "$slice_N_name_2" "$slice_N_id_2" "$slice_N_default_2" "$slice_P_name_1" "$slice_P_id_1" "$slice_P_default_1" "$slice_P_name_2" "$slice_P_id_2" "$slice_P_default_2" >> $arquivo_destino
 
 		#Funcao3
-#		escreve_dnn_json
+
+#		resultado=$(escreve_dnn_json "$ddn_N" "$ddn_P")
+#		echo $resultado
+
+#		escreve_dnn_json $ddn_N $ddn_P >> $arquivo_destino
 		
 		#Funcao4
 #		escreve_apn_json
