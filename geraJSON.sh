@@ -49,7 +49,9 @@
 #		- Adicionado chamada ao escreve_dnn_json
 #	v1.11 27/09/2023, Rafael:
 #		- Ajustado escreve_dnn_json
-#
+#	v1.12 27/09/2023, Rafael:
+#		- Criado extrai_apn
+#		- Criado escreve_apn_json
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
@@ -267,13 +269,50 @@ extrai_dnn(){
 
 		((contador++))
 	done
-	
-#	echo "Quantidade de DNNs: $num_dnn"
-#	echo "--- Lista DNN ---"
-#	echo "$lista_dnn"
-#	echo "-----------------"
-#	echo "$num_dnn"
+}
 
+# ------------------------------------------------------------------------ #
+
+# Ajustar bug do teste T001_001. Tem a feature APN006 faltando valores.
+
+extrai_apn(){
+#	$1 -> lst_feature(_prev)
+	lista_feature=$1
+	lista_apn=$(possui_feature "$lista_feature" "=APN")
+	
+	# Seleciona as APN da lst_feature(_prev)
+	#lista_apn=$(echo "$apn" | cut -c7-14)
+	
+	#Conta o numero de apn
+	num_apn=$(echo "$lista_apn" | grep -o "=APN0" | wc -l)
+	contador=1
+	limite=($num_apn)
+	((limite++))
+	declare -a apn
+	
+	echo "$num_apn"
+	while [ "$contador" -lt "$limite" ]; do
+
+		linha=$(echo "$lista_apn" | sed -n "${contador}p")
+		
+		apn=$(extrai_feature "$linha" "FTRCD=")
+		apn_eqosid=$(extrai_feature "$linha" "EQOSID=")
+		apn_id=$(extrai_feature "$linha" "APNID=")
+		apn_name=$(extrai_feature "$linha" "APNNAME=")
+		apn_ip=$(extrai_feature "$linha" "TIPOIP=")
+		apn_ipv4=$(extrai_feature "$linha" "IPV4=")
+		apn_ipv6=$(extrai_feature "$linha" "IPV6=")
+
+		echo "$apn"
+		echo "$apn_eqosid"
+		echo "$apn_id"
+		echo "$apn_name"
+		echo "$apn_ip"
+		echo "$apn_ipv4"
+		echo "$apn_ipv6"
+		
+		((contador++))
+	done
 }
 
 # ------------------------------------------------------------------------ #
@@ -842,9 +881,91 @@ escreve_dnn_json(){
 
 #--------------------------------------------------------------------------------------------
 
+escreve_apn_json(){
+#	$1  -> $apn_N(P)
+#	$2	-> ACT/CAN
+
+	apn_N=$1
+	act_can=$2
+	
+	#							sed -n '1p' -> pega a primeira linha
+	apn_N_qtd=$(echo "$apn_N" | sed -n '1p')
+	#						sed '1d' -> apaga a primeira linha.
+	apn_N=$(echo "$apn_N" | sed '1d')
+	
+	apn_json=""  
+
+	for ((i = 1; i <= $apn_N_qtd; i++))
+	do
+		apn=$(echo "$apn_N" | sed -n '1p')
+		apn_N=$(echo "$apn_N" | sed '1d')
+		apn_id=$(echo "$apn_N" | sed -n '1p')
+		apn_N=$(echo "$apn_N" | sed '1d')
+		apn_name=$(echo "$apn_N" | sed -n '1p')
+		apn_N=$(echo "$apn_N" | sed '1d')
+		apn_eqosid=$(echo "$apn_N" | sed -n '1p')
+		apn_N=$(echo "$apn_N" | sed '1d')
+		apn_ip=$(echo "$apn_N" | sed -n '1p')
+		apn_N=$(echo "$apn_N" | sed '1d')
+		apn_ipv4=$(echo "$apn_N" | sed -n '1p')
+		apn_N=$(echo "$apn_N" | sed '1d')
+		apn_ipv6=$(echo "$apn_N" | sed -n '1p')
+		apn_N=$(echo "$apn_N" | sed '1d')
+
+#		echo "$i"
+#		echo "$apn"
+#		echo "$apn_eqosid"
+#		echo "$apn_id"
+#		echo "$apn_name"
+#		echo "$apn_ip"
+#		echo "$apn_ipv4"
+#		echo "$apn_ipv6"
+	
+	apn_json+=",
+						{
+                            "servico":{
+                                "id":"$apn"
+                            },
+                            "operacao":{
+                                "id":"ACT"
+                            },
+                            "parametro":[
+								{
+									"nome":"EQOSID",
+									"valor":"$apn_eqosid"
+								},
+                                {
+                                    "nome":"APNID",
+                                    "valor":"$apn_id"
+                                },
+								{
+									"nome":"APNNAME",
+									"valor":"$apn_name"
+								},
+                                {
+                                    "nome":"TIPOIP",
+                                    "valor":"$apn_ip" 
+                                },
+                                {
+                                    "nome":"IPV4",
+                                    "valor":"$apn_ipv4"
+                                },
+                                {
+                                    "nome":"IPV6",
+                                    "valor":"$apn_ipv6"
+                                }
+                            ]
+                        }"
+	done
+
+	echo "$apn_json"
+	
+}	# Essa chave fecha o escreve_apn_json
+
+#--------------------------------------------------------------------------------------------
+
 fecha_json(){
-	final="
-                    ]
+	final="                    ]
                   }
                }
             }
@@ -915,10 +1036,13 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		slice_P_default_2=$(echo "$slice_P" | sed -n '6p')
 		dnn_N=$(extrai_dnn "$lst_feature")
 		dnn_P=$(extrai_dnn "$lst_feature_prev")
+#		--
+		apn_N=$(extrai_apn "$lst_feature")
+		apn_P=$(extrai_apn "$lst_feature_prev")
+#		--		
 		
-		
-#		echo "------------------------"
-#		echo "$nome_arquivo"
+		echo "------------------------"
+		echo "$nome_arquivo"
 #		echo "REQ_ID: $req_id"
 #		echo "Acao: $acao"
 #		echo "Telefone: $telefone"
@@ -936,14 +1060,16 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 #		echo "5GSA_P:---$_5GSA_P"
 #		echo "SLICE_N: $slice_N"
 #		echo "SLICE_P: $slice_P"
-#		if [ "$nome_arquivo" = "T0090_009" ]; then
-#			echo "----------------------------------------$nome_arquivo----------------------------------------$"
+#		if [ "$nome_arquivo" = "T0050_004" ]; then
+			echo "----------------------------------------$nome_arquivo----------------------------------------$"
 #			echo "slice N: $slice_N_name_1 $slice_N_id_1 $slice_N_default_1 / $slice_N_name_2 $slice_N_id_2 $slice_N_default_2"
 #			echo "slice P: $slice_P_name_1 $slice_P_id_1 $slice_P_default_1 / $slice_P_name_2 $slice_P_id_2 $slice_P_default_2"
 #			echo "$dnn_N"
 #			echo "$dnn_P"
-#			echo "DNN N: $ddn_N"
-#			echo "DNN P: $ddn_P"
+#			echo "--------- apn_New"
+#			echo "$apn_N"
+#			echo "--------- apn_Prev"
+#			echo "$apn_P"
 #		fi
 #		echo "$dnn_N_qtd"
 #
@@ -965,7 +1091,8 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		escreve_dnn_json "$dnn_P" "CAN" >> $arquivo_destino
 
 		#Funcao4
-#		escreve_apn_json
+		escreve_apn_json "$apn_N" "ACT" >> $arquivo_destino
+		escreve_apn_json "$apn_P" "CAN" >> $arquivo_destino
 
 		#Funcao5
 		fecha_json >> $arquivo_destino
