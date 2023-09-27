@@ -47,6 +47,9 @@
 #		- Ajustado a organizacao dos campos slice
 #		- Criado extrai_dnn
 #		- Adicionado chamada ao escreve_dnn_json
+#	v1.11 27/09/2023, Rafael:
+#		- Ajustado escreve_dnn_json
+#
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
@@ -298,9 +301,8 @@ extrai_FTRCD() {
 	
     # Retorna as linhas_ftrcd contendo "FTRCD"
     echo -e "$feature"
-
-#	echo "lst_feature_prevFUNCAO"
 }
+
 # ------------------------------------------------------------------------ #
 
 extrai_lst_feature() {
@@ -326,6 +328,7 @@ extrai_lst_feature_prev() {
 	lst_feature_prev="${lst_FTRCD#*,}"
 	echo "$lst_feature_prev"
 }
+
 # ------------------------------------------------------------------------ #
 
 possui_feature(){
@@ -739,65 +742,101 @@ json_slice=""
 #--------------------------------------------------------------------------------------------
 
 escreve_dnn_json(){
-#	$1  -> $ddn_N
-#	$2	-> $ddn_P
-	
-	dnn_N=$1
-	dnn_P=$2
-	
-	dnn_N_qtd=$(echo "$dnn_N" | sed -n '1p')
+#	$1  -> $dnn_N(P)
+#	$2	-> ACT/CAN
 
-	echo "$dnn_N_qtd"
+	dnn_N=$1
+	act_can=$2
 	
+	#							sed -n '1p' -> pega a primeira linha
+	dnn_N_qtd=$(echo "$dnn_N" | sed -n '1p')
+	#						sed '1d' -> apaga a primeira linha.
+	dnn_N=$(echo "$dnn_N" | sed '1d')
 	
-	dnn_json=""
+	dnn_json=""  
+
+	for ((i = 1; i <= $dnn_N_qtd; i++))
+	do
+		dnn=$(echo "$dnn_N" | sed -n '1p')
+		dnn_N=$(echo "$dnn_N" | sed '1d')
+		dnn_id=$(echo "$dnn_N" | sed -n '1p')
+		dnn_N=$(echo "$dnn_N" | sed '1d')
+		dnn_name=$(echo "$dnn_N" | sed -n '1p')
+		dnn_N=$(echo "$dnn_N" | sed '1d')
+		dnn_eqosid=$(echo "$dnn_N" | sed -n '1p')
+		dnn_N=$(echo "$dnn_N" | sed '1d')
+		dnn_ip=$(echo "$dnn_N" | sed -n '1p')
+		dnn_N=$(echo "$dnn_N" | sed '1d')
+		dnn_ipv4=$(echo "$dnn_N" | sed -n '1p')
+		dnn_N=$(echo "$dnn_N" | sed '1d')
+		dnn_ipv6=$(echo "$dnn_N" | sed -n '1p')
+		dnn_N=$(echo "$dnn_N" | sed '1d')
+		dnn_default=$(echo "$dnn_N" | sed -n '1p')
+		dnn_N=$(echo "$dnn_N" | sed '1d')
+		dnn_sliceid=$(echo "$dnn_N" | sed -n '1p')
+		dnn_N=$(echo "$dnn_N" | sed '1d')
+
+#		echo "$i"
+#		echo "$dnn"
+#		echo "$dnn_id"
+#		echo "$dnn_name"
+#		echo "$dnn_eqosid"
+#		echo "$dnn_ip"
+#		echo "$dnn_ipv4"
+#		echo "$dnn_ipv6"
+#		echo "$dnn_default"
+#		echo "$dnn_sliceid"
+	
 	dnn_json+=",
                         {
-                            "servico":{
-                                "id":"DNN001"
+                            \"servico\":{
+                                \"id\":\"$dnn\"
                             },
-                            "operacao":{
-                                "id":"ACT"
+                            \"operacao\":{
+                                \"id\":\"$act_can\"
                             },
-                            "parametro":[
+                            \"parametro\":[
                                 {
-                                    "nome":"DNNID",
-                                    "valor":"1"
+                                    \"nome\":\"DNNID\",
+                                    \"valor\":\"$dnn_id\"
                                 },
                                 {
-                                    "nome":"DNNNAME",
-                                    "valor":"teste.com.br"
+                                    \"nome\":\"DNNNAME\",
+                                    \"valor\":\"$dnn_name\"
                                 },
                                 {
-                                    "nome":"EQOSID",
-                                    "valor":"2"
+                                    \"nome\":\"EQOSID\",
+                                    \"valor\":\"$dnn_eqosid\"
                                 },
                                 {
-                                    "nome":"SCHAR",
-                                    "valor":"1"
+                                    \"nome\":\"SCHAR\",
+                                    \"valor\":\"1\"
                                 },
                                 {
-                                    "nome":"TIPOIP",
-                                    "valor":"FIX" 
+                                    \"nome\":\"TIPOIP\",
+                                    \"valor\":\"$dnn_ip\" 
                                 },
                                 {
-                                    "nome":"IPV4",
-                                    "valor":"172.0.0.1"
+                                    \"nome\":\"IPV4\",
+                                    \"valor\":\"$dnn_ipv4\"
                                 },
                                 {
-                                    "nome":"IPV6",
-                                    "valor":"2001.db8:abcf:0012::/64"
+                                    \"nome\":\"IPV6\",
+                                    \"valor\":\"$dnn_ipv6\"
                                 },
                                 {
-                                    "nome":"DEFAULT",
-                                    "valor":"TRUE"
+                                    \"nome\":\"DEFAULT\",
+                                    \"valor\":\"$dnn_default\"
                                 },
                                 {
-                                    "nome":"SLICEID",
-                                    "valor":"1"
+                                    \"nome\":\"SLICEID\",
+                                    \"valor\":\"$dnn_sliceid\"
                                 }
                             ]
                         }"
+	done
+
+	echo "$dnn_json"
 	
 }	# Essa chave fecha o escreve_dnn_json
 
@@ -805,15 +844,15 @@ escreve_dnn_json(){
 
 fecha_json(){
 	final="
-							]
-						}
-					}
-				}
-			}
-		]
-	}
+                    ]
+                  }
+               }
+            }
+         }
+      ]
+   }
 }"
-	echo $final
+	echo "$final"
 }
 
 # ------------------------------------------------------------------------ #
@@ -841,7 +880,6 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		
 		# Cria o arquivo
 		touch "$arquivo_destino"
-		chmod 777 "$arquivo_destino"
 		
 		lst_feature=$(extrai_lst_feature "$arquivo_origem")
 		lst_feature_prev=$(extrai_lst_feature_prev "$arquivo_origem")
@@ -875,13 +913,8 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		slice_P_name_2=$(echo "$slice_P" | sed -n '4p')
 		slice_P_id_2=$(echo "$slice_P" | sed -n '5p')
 		slice_P_default_2=$(echo "$slice_P" | sed -n '6p')
-		#--
 		dnn_N=$(extrai_dnn "$lst_feature")
 		dnn_P=$(extrai_dnn "$lst_feature_prev")
-		#--
-		dnn_N_qtd=$(echo "$dnn_N" | sed -n '1p')
-		
-		
 		
 		
 #		echo "------------------------"
@@ -904,17 +937,17 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 #		echo "SLICE_N: $slice_N"
 #		echo "SLICE_P: $slice_P"
 #		if [ "$nome_arquivo" = "T0090_009" ]; then
-			echo "----------------------------------------$nome_arquivo----------------------------------------$"
+#			echo "----------------------------------------$nome_arquivo----------------------------------------$"
 #			echo "slice N: $slice_N_name_1 $slice_N_id_1 $slice_N_default_1 / $slice_N_name_2 $slice_N_id_2 $slice_N_default_2"
 #			echo "slice P: $slice_P_name_1 $slice_P_id_1 $slice_P_default_1 / $slice_P_name_2 $slice_P_id_2 $slice_P_default_2"
 #			echo "$dnn_N"
-			echo "$dnn_P"
+#			echo "$dnn_P"
 #			echo "DNN N: $ddn_N"
 #			echo "DNN P: $ddn_P"
 #		fi
 #		echo "$dnn_N_qtd"
-
-
+#
+#
 #		echo "------------------------"
 #		echo "lst_feature: $lst_feature"
 #		echo "------------------------"
@@ -927,13 +960,10 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		#Funcao2	 	  	$1				  $2			  $3				   $4				 $5			     $6					  $7				$8				$9					 ${10}			   ${11}		   ${12}
 		escreve_slice_json "$slice_N_name_1" "$slice_N_id_1" "$slice_N_default_1" "$slice_N_name_2" "$slice_N_id_2" "$slice_N_default_2" "$slice_P_name_1" "$slice_P_id_1" "$slice_P_default_1" "$slice_P_name_2" "$slice_P_id_2" "$slice_P_default_2" >> $arquivo_destino
 
-		#Funcao3
+		#Funcao3		  $1	   $2
+		escreve_dnn_json "$dnn_N" "ACT" >> $arquivo_destino
+		escreve_dnn_json "$dnn_P" "CAN" >> $arquivo_destino
 
-#		resultado=$(escreve_dnn_json "$ddn_N" "$ddn_P")
-#		echo $resultado
-
-#		escreve_dnn_json $ddn_N $ddn_P >> $arquivo_destino
-		
 		#Funcao4
 #		escreve_apn_json
 
