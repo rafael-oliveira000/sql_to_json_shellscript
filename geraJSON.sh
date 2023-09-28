@@ -53,6 +53,14 @@
 #	v1.13 28/09/2023, Rafael:
 #		- Melhorado extrai_slice para funcionar dinamicamente
 #		- Ajustado escreve_apn_json para imprimir as aspas
+#	v1.14 28/09/2023, Rafael:
+#		- Ajustado bug no act/prev do escreve_apn_json
+#		- Alterado variavel telefone para msisdn
+#		- Melhorado extrai_msisdn e extrai_imsi para buscar valor na 
+#		lst_feature
+#		- Melhorado a remocao do ".sql" do nome do arquivo
+#		- Melhorado extrai_feature para aproveitar o codigo de 
+#		possui_feature
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
@@ -62,7 +70,6 @@
 #	- Criar uma função unica para testar a existencia do arquivo 
 #	e testar apenas uma vez para cada arquivo.
 # ------------------------------------------------------------------------ #
-#
 # ------------------------------- VARIAVEIS ------------------------------ #
 
 # Diretorio onde estao os arquivos
@@ -81,15 +88,9 @@ data="$dia-$mes-$ano"
 lst_feature=""
 lst_feature_prev=""
 
-# ------------------------------- TESTES --------------------------------- #
-# - Esses testes já estão implementadas dentro das funcoes
-# - Verifica se a linha foi encontrada
-# - Verifica se o arquivo foi encontrado
-
 # ------------------------------- FUNCOES -------------------------------- #
 
 extrai_req_id(){
-        # Le o nome do arquivo a partir do primeiro argumento
         arquivo="$1"
 
         # Extrai a linha com "values" ou "VALUES" do arquivo e a armazena na variavel "linha"
@@ -107,61 +108,21 @@ extrai_req_id(){
         #Remove as aspas
         req_id="${req_id#?}"
         req_id="${req_id%?}"
-
-        # Imprime o valor da variavel req_id na tela
         echo "$req_id"
 }
 
 # ------------------------------------------------------------------------ #
 
-extrai_telefone(){
-        # Le o nome do arquivo a partir do primeiro argumento
-        arquivo="$1"
-
-        # Extrai a linha com "values" ou "VALUES" do arquivo e a armazena na variavel "linha"
-        linha=$(grep -i 'values' "$arquivo")
-
-        # Verifica se a linha foi encontrada
-        if [ -z "$linha" ]; then
-                echo "Nenhuma linha contendo 'values' ou 'VALUES' foi encontrada no arquivo."
-                exit 1
-        fi
-		
-        #Extrair o numero de telefone
-        telefone=$(echo "$linha" | cut -d ',' -f 58)
-
-        #Remove as aspas
-        telefone="${telefone#?}"
-        telefone="${telefone%?}"
-
-        #Imprime o numero do telefone
-        echo "$telefone"
+extrai_msisdn(){
+	msisdn=$(extrai_feature "$1" "MSISDN=")
+	echo $msisdn
 }
 
 # ------------------------------------------------------------------------ #
 
 extrai_imsi(){
-        # Le o nome do arquivo a partir do primeiro argumento
-        arquivo="$1"
-
-        # Extrai a linha com "values" ou "VALUES" do arquivo e a armazena na variavel "linha"
-        linha=$(grep -i 'values' "$arquivo")
-
-        # Verifica se a linha foi encontrada
-        if [ -z "$linha" ]; then
-                echo "Nenhuma linha contendo 'values' ou 'VALUES' foi encontrada no arquivo."
-                exit 1
-        fi
-		
-        #Extrair o numero imsi
-        imsi=$(echo "$linha" | cut -d ',' -f 59)
-
-        #Remove as aspas
-        imsi="${imsi#?}"
-        imsi="${imsi%?}"
-
-        #Imprime o numero do imsi
-        echo "$imsi"
+	imsi=$(extrai_feature "$1" "IMSI=")
+	echo $imsi
 }
 
 # ------------------------------------------------------------------------ #
@@ -221,7 +182,6 @@ extrai_slice(){
 		slice=$(extrai_feature "$linha" "FTRCD=")
 		slice_id=$(extrai_feature "$linha" "SLICEID=")
 		slice_default=$(extrai_feature "$linha" "DEFAULT=")
-		
 		echo "$slice"
 		echo "$slice_id"
 		echo "$slice_default"
@@ -237,9 +197,6 @@ extrai_dnn(){
 	lista_feature=$1
 	lista_dnn=$(possui_feature "$lista_feature" "=DNN")
 	
-	# Seleciona as DNN da lst_feature(_prev)
-	#lista_dnn=$(echo "$dnn" | cut -c7-14)
-	
 	#Conta o numero de dnn
 	num_dnn=$(echo "$lista_dnn" | grep -o "=DNN" | wc -l)
 	contador=1
@@ -249,7 +206,6 @@ extrai_dnn(){
 	
 	echo "$num_dnn"
 	while [ "$contador" -lt "$limite" ]; do
-
 		linha=$(echo "$lista_dnn" | sed -n "${contador}p")
 		
 		dnn=$(extrai_feature "$linha" "FTRCD=")
@@ -261,7 +217,6 @@ extrai_dnn(){
 		dnn_ipv6=$(extrai_feature "$linha" "IPV6=")
 		dnn_default=$(extrai_feature "$linha" "DEFAULT=")
 		dnn_sliceid=$(extrai_feature "$linha" "SLICEID=")
-		
 		echo "$dnn"
 		echo "$dnn_id"
 		echo "$dnn_name"
@@ -271,7 +226,6 @@ extrai_dnn(){
 		echo "$dnn_ipv6"
 		echo "$dnn_default"
 		echo "$dnn_sliceid"
-
 		((contador++))
 	done
 }
@@ -297,7 +251,7 @@ extrai_apn(){
 	
 	echo "$num_apn"
 	while [ "$contador" -lt "$limite" ]; do
-
+	
 		linha=$(echo "$lista_apn" | sed -n "${contador}p")
 		
 		apn=$(extrai_feature "$linha" "FTRCD=")
@@ -307,7 +261,6 @@ extrai_apn(){
 		apn_ip=$(extrai_feature "$linha" "TIPOIP=")
 		apn_ipv4=$(extrai_feature "$linha" "IPV4=")
 		apn_ipv6=$(extrai_feature "$linha" "IPV6=")
-
 		echo "$apn"
 		echo "$apn_eqosid"
 		echo "$apn_id"
@@ -315,7 +268,6 @@ extrai_apn(){
 		echo "$apn_ip"
 		echo "$apn_ipv4"
 		echo "$apn_ipv6"
-		
 		((contador++))
 	done
 }
@@ -326,24 +278,19 @@ extrai_FTRCD() {
     local arquivo="$1"  # Nome do arquivo passado como parâmetro
     local linhas_ftrcd=""  # Variável para armazenar as linhas contendo "FTRCD" ou "CUSTOMER"
 
-    # Verifica se o arquivo existe
-    if [ -f "$arquivo" ]; then
-        # Loop para ler cada linha do arquivo
-        while IFS= read -r linha; do
-            # Verifica se a linha contém "FTRCD" ou "CUSTOMER"
-            if [[ "$linha" == *"FTRCD"* || "$linha" == *"CUSTOMER"* ]]; then
-                # Adiciona a linha à variável
-                linhas_ftrcd="${linhas_ftrcd}${linha}\n"
-            fi
-        done < "$arquivo"
-    else
-        echo "O arquivo '$arquivo' não existe."
-        return 1
-    fi
+	# Loop para ler cada linha do arquivo
+	while IFS= read -r linha; do
+		# Verifica se a linha contém "FTRCD" ou "CUSTOMER"
+		if [[ "$linha" == *"FTRCD"* || "$linha" == *"CUSTOMER"* ]]; then
+			# Adiciona a linha à variável
+			linhas_ftrcd="${linhas_ftrcd}${linha}\n"
+		fi
+	done < "$arquivo"
+
 	feature="FTRCD"
 	feature+="${linhas_ftrcd#*FTRCD}"
 	
-    # Retorna as linhas_ftrcd contendo "FTRCD"
+    # Retorna as linhas_ftrcd contendo "FTRCD" ou "CUSTOMER"
     echo -e "$feature"
 }
 
@@ -352,7 +299,7 @@ extrai_FTRCD() {
 extrai_lst_feature() {
 	lst_FTRCD=$(extrai_FTRCD $1)
 	
-	# Substring pré-determinada que você deseja encontrar
+	# Substring pré-determinada que sera encontrada
 	substring=","
 	
 	# Use o comando 'expr' para encontrar a posição da substring
@@ -377,8 +324,8 @@ extrai_lst_feature_prev() {
 # ------------------------------------------------------------------------ #
 
 possui_feature(){
-	# $1 -> $lst_feature(_prev)
-	# $2 -> $HSS, $5GNSA ou $5GSA
+#	$1 -> $lst_feature(_prev)
+#	$2 -> $feature (HLR, IMSI etc)
 	lista_feature=$1
 	feature=$2
 	
@@ -397,21 +344,14 @@ possui_feature(){
 
 extrai_feature(){
 #	$1 -> $lst_feature(_prev)
-#	$2 -> $feature (HLR, acao)
+#	$2 -> $feature (HLR, IMSI etc)
 	lista_feature=$1
 	feature=$2
 	
-	# Extrai a linha com feature da lista de feature e a armazena na variavel "linha"
-	linha=$(echo "$lista_feature" | grep "$feature")
+	linha=$(possui_feature "$lista_feature" "$feature")
 
-	# Verifica se a linha foi encontrada
-	if [ -z "$linha" ]; then
-#		echo "Nenhuma linha contendo '$2' foi encontrada na lista de feature."
-		echo ""
-	fi
 	#Extrair o valor da feature
 	valor=$(echo "$linha" | sed -n "s/.*$feature\([^;]*\).*/\1/p")
-
 	echo "$valor"
 }
 
@@ -420,7 +360,7 @@ extrai_feature(){
 escreve_json(){
 #	$1 -> $req_id
 #	$2 -> $acao
-#	$3 -> $telefone
+#	$3 -> $msisdn
 #	$4 -> $iccid
 #	$5 -> $imsi
 #	$6 -> $HLR_N
@@ -506,7 +446,6 @@ escreve_json(){
 	testa_HLR_P=""
 	testa_HLR_P=$7
 	if [ -n "$testa_HLR_P" ]; then
-	
 	json+=",
                         {
                             \"servico\": {
@@ -659,7 +598,6 @@ escreve_json(){
                            }
                         }"
 	fi
-	
 	echo "$json"
 }	# Essa chave fecha o escreve_json
 
@@ -671,14 +609,11 @@ escreve_slice_json(){
 
 	slice_N=$1
 	act_can=$2
-	
 	#								sed -n '1p' -> pega a primeira linha
 	slice_N_qtd=$(echo "$slice_N" | sed -n '1p')
 	#							sed '1d' -> apaga a primeira linha.
 	slice_N=$(echo "$slice_N" | sed '1d')
-	
 	slice_json=""  
-
 	if [ -n "$slice_N" ]; then
 		for ((i = 1; i <= $slice_N_qtd; i++))
 		do
@@ -709,7 +644,6 @@ escreve_slice_json(){
 								]
 							}"
 		done
-	
 		echo "$slice_json"
 	fi
 }	# Essa chave fecha o escreve_slice_json
@@ -722,14 +656,11 @@ escreve_dnn_json(){
 
 	dnn_N=$1
 	act_can=$2
-	
 	#							sed -n '1p' -> pega a primeira linha
 	dnn_N_qtd=$(echo "$dnn_N" | sed -n '1p')
 	#						sed '1d' -> apaga a primeira linha.
 	dnn_N=$(echo "$dnn_N" | sed '1d')
-	
 	dnn_json=""  
-
 	for ((i = 1; i <= $dnn_N_qtd; i++))
 	do
 		dnn=$(echo "$dnn_N" | sed -n '1p')
@@ -751,7 +682,7 @@ escreve_dnn_json(){
 		dnn_sliceid=$(echo "$dnn_N" | sed -n '1p')
 		dnn_N=$(echo "$dnn_N" | sed '1d')
 	
-	dnn_json+=",
+		dnn_json+=",
                         {
                             \"servico\":{
                                 \"id\":\"$dnn\"
@@ -799,9 +730,7 @@ escreve_dnn_json(){
                             ]
                         }"
 	done
-
 	echo "$dnn_json"
-	
 }	# Essa chave fecha o escreve_dnn_json
 
 # ------------------------------------------------------------------------ #
@@ -843,7 +772,7 @@ escreve_apn_json(){
                                 \"id\":\"$apn\"
                             },
                             \"operacao\":{
-                                \"id\":\"ACT\"
+                                \"id\":\"$act_can\"
                             },
                             \"parametro\":[
 								{
@@ -890,7 +819,6 @@ fecha_json(){
 	echo "$final"
 }
 # ------------------------------------------------------------------------ #
-
 # ------------------------------- EXECUCAO ------------------------------- #
 
 # Verifica se o subdiretório de destino existe, senão cria
@@ -898,16 +826,13 @@ mkdir -p "$subdiretorio_destino"
 
 # Loop para processar arquivos .sql e .js no diretório de origem
 for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
-	# Verifica se o arquivo é  uivo
+	# Verifica se o arquivo existe
 	if [ -f "$arquivo_origem" ]; then
 		# Obtém o nome do arquivo sem o caminho
 		nome_arquivo=$(basename "$arquivo_origem")
 		
 		# Remove o .sql
-		nome_arquivo="${nome_arquivo%?}"
-		nome_arquivo="${nome_arquivo%?}"
-		nome_arquivo="${nome_arquivo%?}"
-		nome_arquivo="${nome_arquivo%?}"
+		nome_arquivo="${nome_arquivo%????}"
 		
 		# Cria o caminho completo para o arquivo de destino no subdiretório
 		arquivo_destino="$subdiretorio_destino/$nome_arquivo.js"
@@ -915,12 +840,12 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		# Cria o arquivo
 		touch "$arquivo_destino"
 		
+		# Atribui valor as variaveis
 		lst_feature=$(extrai_lst_feature "$arquivo_origem")
 		lst_feature_prev=$(extrai_lst_feature_prev "$arquivo_origem")
-		
 		req_id=$(extrai_req_id "$arquivo_origem")
-		telefone=$(extrai_telefone "$arquivo_origem")
-		imsi=$(extrai_imsi "$arquivo_origem")
+		msisdn=$(extrai_msisdn "$lst_feature")
+		imsi=$(extrai_imsi "$lst_feature")
 		iccid=$(extrai_iccid "$lst_feature")
 		acao=$(extrai_acao "$lst_feature")
 		HLR_N=$(extrai_HLR "$lst_feature")
@@ -940,10 +865,10 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		apn_N=$(extrai_apn "$lst_feature")
 		apn_P=$(extrai_apn "$lst_feature_prev")
 		
-		echo "----------------------------------------$nome_arquivo----------------------------------------$"
+		echo "# ------------------------------$nome_arquivo----------------------------- #"
 #		echo "REQ_ID: $req_id"
-#		echo "Acao: $acao"
-#		echo "Telefone: $telefone"
+#		echo "ACAO: $acao"
+#		echo "MSISDN: $msisdn"
 #		echo "IMSI: $imsi"
 #		echo "ICCID: $iccid"
 #		echo "HLR_N: $HLR_N"
@@ -956,8 +881,6 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 #		echo "5GNSA_P:--$_5GNSA_P"
 #		echo "5GSA_N:---$_5GSA_N"
 #		echo "5GSA_P:---$_5GSA_P"
-#		echo "SLICE_N: $slice_N"
-#		echo "SLICE_P: $slice_P"
 #		if [ "$nome_arquivo" = "T9999_999" ]; then
 #			echo "-----SLICE N-----"
 #			echo "$slice_N"
@@ -974,35 +897,31 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 #			echo "$apn_P"
 #			echo "-----------------"
 #		fi
+#		echo "------lst_feature------"
+#		echo "$lst_feature"
 #		echo "------------------------"
-#		echo "lst_feature: $lst_feature"
-#		echo "------------------------"
-#		echo "lst_feature_prev: $lst_feature_prev"
+#		echo "----lst_feature_prev----"
+#		echo "$lst_feature_prev"
 #		echo "------------------------"
 
-		#Funcao1 	  $1		$2		$3			$4		 $5		 $6		  $7	   $8			$9			 ${10}	  ${11}	   ${12}	   ${13}	   ${14}	  ${15}
-		escreve_json "$req_id" "$acao" "$telefone" "$iccid" "$imsi" "$HLR_N" "$HLR_P" "$profile_N" "$profile_P" "$HSS_N" "$HSS_P" "$_5GNSA_N" "$_5GNSA_P" "$_5GSA_N" "$_5GSA_P"  > $arquivo_destino
-		
-		#Funcao2			$1		   $2
-		escreve_slice_json "$slice_N" "ACT" >> $arquivo_destino
-		escreve_slice_json "$slice_p" "CAN" >> $arquivo_destino
+		# Gerar JSON
+		#Funcao1 	  $1		$2		$3		  $4	   $5	   $6	    $7		 $8			  $9		   ${10}	${11}	 ${12}	     ${13}	  	 ${14}		${15}
+		escreve_json "$req_id" "$acao" "$msisdn" "$iccid" "$imsi" "$HLR_N" "$HLR_P" "$profile_N" "$profile_P" "$HSS_N" "$HSS_P" "$_5GNSA_N" "$_5GNSA_P" "$_5GSA_N" "$_5GSA_P"  > $arquivo_destino
 
-		#Funcao3		  $1	   $2
-		escreve_dnn_json "$dnn_N" "ACT" >> $arquivo_destino
-		escreve_dnn_json "$dnn_P" "CAN" >> $arquivo_destino
-
-		#Funcao4		  $1	   $2
+		#Funcao 2, 3 e 4 escrevendo primeiro o NEW e depois o PREV do APN, SLICE e DNN
 		escreve_apn_json "$apn_N" "ACT" >> $arquivo_destino
+		escreve_slice_json "$slice_N" "ACT" >> $arquivo_destino
+		escreve_dnn_json "$dnn_N" "ACT" >> $arquivo_destino
+
 		escreve_apn_json "$apn_P" "CAN" >> $arquivo_destino
+		escreve_slice_json "$slice_p" "CAN" >> $arquivo_destino
+		escreve_dnn_json "$dnn_P" "CAN" >> $arquivo_destino
 
 		#Funcao5
 		fecha_json >> $arquivo_destino
-		
     fi
 done
-
-echo "------------------------"
-echo "Processo concluido"
-echo "------------------------"
-
+echo "# -------------------------------------------------------------------- #"
+echo "# --------------------------Processo concluido------------------------ #"
+echo "# -------------------------------------------------------------------- #"
 # ------------------------------------------------------------------------ #
