@@ -5,7 +5,6 @@
 #				teste de interface
 # Autor:      Rafael Oliveira
 # Manutencao: Rafael Oliveira
-#
 # ------------------------------------------------------------------------ #
 #	Este programa ira gerar um teste de interface JSON a partir de testes
 #	da sps_solicitacao
@@ -16,7 +15,6 @@
 #		subdiretorio_destino
 # ------------------------------------------------------------------------ #
 # Historico:
-#
 #   v1.1 18/09/2023, Rafael:
 #		- Versao inicial que extrai informacoes do .sql
 #   v1.2 19/09/2023, Rafael:
@@ -52,6 +50,9 @@
 #	v1.12 27/09/2023, Rafael:
 #		- Criado extrai_apn
 #		- Criado escreve_apn_json
+#	v1.13 28/09/2023, Rafael:
+#		- Melhorado extrai_slice para funcionar dinamicamente
+#		- Ajustado escreve_apn_json para imprimir as aspas
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
@@ -60,9 +61,6 @@
 # -------------- MELHORIAS A SEREM FEITAS PARA geraJSON_2.0 -------------- #
 #	- Criar uma função unica para testar a existencia do arquivo 
 #	e testar apenas uma vez para cada arquivo.
-#	- Melhorar a funcao extrai_slice para que o numero de slices seja
-#	dinamico invés de no maximo 2. Tambem alterar a forma que o JSON
-#	recebe essa informacao.
 # ------------------------------------------------------------------------ #
 #
 # ------------------------------- VARIAVEIS ------------------------------ #
@@ -84,7 +82,9 @@ lst_feature=""
 lst_feature_prev=""
 
 # ------------------------------- TESTES --------------------------------- #
-
+# - Esses testes já estão implementadas dentro das funcoes
+# - Verifica se a linha foi encontrada
+# - Verifica se o arquivo foi encontrado
 
 # ------------------------------- FUNCOES -------------------------------- #
 
@@ -111,6 +111,7 @@ extrai_req_id(){
         # Imprime o valor da variavel req_id na tela
         echo "$req_id"
 }
+
 # ------------------------------------------------------------------------ #
 
 extrai_telefone(){
@@ -136,6 +137,7 @@ extrai_telefone(){
         #Imprime o numero do telefone
         echo "$telefone"
 }
+
 # ------------------------------------------------------------------------ #
 
 extrai_imsi(){
@@ -161,13 +163,14 @@ extrai_imsi(){
         #Imprime o numero do imsi
         echo "$imsi"
 }
+
 # ------------------------------------------------------------------------ #
 
 extrai_iccid(){
 	iccid=$(extrai_feature "$1" "ICCID=")
 	echo $iccid
-
 }
+
 # ------------------------------------------------------------------------ #
 
 extrai_acao(){
@@ -198,31 +201,33 @@ extrai_profile(){
 extrai_slice(){
 	# $1 -> lst_feature(_prev)
 	lista_feature=$1
-	slice=$(possui_feature "$lista_feature" "=SLICE")
+	lista_slice=$(possui_feature "$lista_feature" "=SLICE")
 	
-	# Seleciona os slices da lst_feature(_prev)
+	# Seleciona as SLICE da lst_feature(_prev)
 	#lista_slice=$(echo "$slice" | cut -c7-14)
 	
-	#Conta o numero de slices
-	num_dnn=$(echo "$lista_slice" | grep -o "=SLICE" | wc -l)
+	#Conta o numero de slice
+	num_slice=$(echo "$lista_slice" | grep -o "=SLICE" | wc -l)
+	contador=1
+	limite=($num_slice)
+	((limite++))
+	declare -a slice
+	
+	echo "$num_slice"
+	while [ "$contador" -lt "$limite" ]; do
 
-	slice_name=$(echo "$slice" | cut -c7-14)
-	slice_id=$(echo "$slice" | cut -c37-37)
-	slice_default=$(extrai_feature "$slice" "DEFAULT=")
-	
-	slice_name_1=$(echo -e "$slice_name" | head -n 1)
-	slice_name_2=$(echo -e "$slice_name" | sed -n '2p')
-	slice_id_1=$(echo -e "$slice_id" | head -n 1)
-	slice_id_2=$(echo -e "$slice_id" | sed -n '2p')
-	slice_default_1=$(echo -e "$slice_default" | head -n 1)
-	slice_default_2=$(echo -e "$slice_default" | sed -n '2p')
-	
-	echo "$slice_name_1"
-	echo "$slice_id_1"
-	echo "$slice_default_1"
-	echo "$slice_name_2"
-	echo "$slice_id_2"
-	echo "$slice_default_2"
+		linha=$(echo "$lista_slice" | sed -n "${contador}p")
+		
+		slice=$(extrai_feature "$linha" "FTRCD=")
+		slice_id=$(extrai_feature "$linha" "SLICEID=")
+		slice_default=$(extrai_feature "$linha" "DEFAULT=")
+		
+		echo "$slice"
+		echo "$slice_id"
+		echo "$slice_default"
+
+		((contador++))
+	done
 }
 
 # ------------------------------------------------------------------------ #
@@ -360,6 +365,7 @@ extrai_lst_feature() {
 	fi
 	echo "$lst_feature"
 }
+
 # ------------------------------------------------------------------------ #
 
 extrai_lst_feature_prev() {
@@ -657,128 +663,58 @@ escreve_json(){
 	echo "$json"
 }	# Essa chave fecha o escreve_json
 
-#--------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------ #
 
 escreve_slice_json(){
-#	$1 -> $slice_N_name_1
-#	$2 -> $slice_N_id_1
-#	$3 -> $slice_N_default_1
-#	$4 -> $slice_N_name_2
-#	$5 -> $slice_N_id_2
-#	$6 -> $slice_N_default_2
-#	$7 -> $slice_P_name_1
-#	$8 -> $slice_P_id_1
-#	$9->  $slice_P_default_1
-#	$10 ->$slice_P_name_2
-#	$11-> $slice_P_id_2
-#	$12-> $slice_P_default_2
+#	$1  -> $slice_N
+#	$2	-> ACT/CAN
 
-json_slice=""
+	slice_N=$1
+	act_can=$2
+	
+	#								sed -n '1p' -> pega a primeira linha
+	slice_N_qtd=$(echo "$slice_N" | sed -n '1p')
+	#							sed '1d' -> apaga a primeira linha.
+	slice_N=$(echo "$slice_N" | sed '1d')
+	
+	slice_json=""  
 
-#	Se slice_N_name_1 nao estiver vazia, escrever o bloco com SLICE.
-	testa_slice_N_1=""
-	testa_slice_N_1=$1
-	if [ -n "$testa_slice_N_1" ]; then
-		json_slice+=",
+	if [ -n "$slice_N" ]; then
+		for ((i = 1; i <= $slice_N_qtd; i++))
+		do
+			slice=$(echo "$slice_N" | sed -n '1p')
+			slice_N=$(echo "$slice_N" | sed '1d')
+			slice_id=$(echo "$slice_N" | sed -n '1p')
+			slice_N=$(echo "$slice_N" | sed '1d')
+			slice_default=$(echo "$slice_N" | sed -n '1p')
+			slice_N=$(echo "$slice_N" | sed '1d')
+			
+			slice_json+=",
 							{
 								\"servico\":{
-									\"id\":\"$1\"
+									\"id\":\"$slice\"
 								},
 								\"operacao\":{
-									\"id\":\"ACT\"
+									\"id\":\"$act_can\"
 								},
 								\"parametro\":[
 									{
 										\"nome\":\"SLICEID\",
-										\"valor\":\"$2\"
+										\"valor\":\"$slice_id\"
 									},
 									{
 										\"nome\":\"DEFAULT\",
-										\"valor\":\"$3\"
+										\"valor\":\"$slice_default\"
 									}
 								]
 							}"
-	fi
+		done
 	
-#	Se slice_N_name_2 nao estiver vazia, escrever o bloco com SLICE.
-	testa_slice_N_2=""
-	testa_slice_N_2=$4
-	if [ -n "$testa_slice_N_2" ]; then
-		json_slice+=",
-							{
-								\"servico\":{
-									\"id\":\"$4\"
-								},
-								\"operacao\":{
-									\"id\":\"ACT\"
-								},
-								\"parametro\":[
-									{
-										\"nome\":\"SLICEID\",
-										\"valor\":\"$5\"
-									},
-									{
-										\"nome\":\"DEFAULT\",
-										\"valor\":\"$6\"
-									}
-								]
-							}"
+		echo "$slice_json"
 	fi
-	
-#	Se slice_P_name_1 nao estiver vazia, escrever o bloco com SLICE.
-	testa_slice_P_1=""
-	testa_slice_P_1=$7
-	if [ -n "$testa_slice_P_1" ]; then
-		json_slice+=",
-							{
-								\"servico\":{
-									\"id\":\"$7\"
-								},
-								\"operacao\":{
-									\"id\":\"CAN\"
-								},
-								\"parametro\":[
-									{
-										\"nome\":\"SLICEID\",
-										\"valor\":\"$8\"
-									},
-									{
-										\"nome\":\"DEFAULT\",
-										\"valor\":\"$9\"
-									}
-								]
-							}"
-	fi
-	
-#	Se slice_P_name_2 nao estiver vazia, escrever o bloco com SLICE.
-	testa_slice_P_2=""
-	testa_slice_P_2=${10}
-	if [ -n "$testa_slice_P_2" ]; then
-		json_slice+=",
-							{
-								\"servico\":{
-									\"id\":\"${10}\"
-								},
-								\"operacao\":{
-									\"id\":\"CAN\"
-								},
-								\"parametro\":[
-									{
-										\"nome\":\"SLICEID\",
-										\"valor\":\"${11}\"
-									},
-									{
-										\"nome\":\"DEFAULT\",
-										\"valor\":\"${12}\"
-									}
-								]
-							}"
-	fi
-	
-	echo "$json_slice"
 }	# Essa chave fecha o escreve_slice_json
 
-#--------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------ #
 
 escreve_dnn_json(){
 #	$1  -> $dnn_N(P)
@@ -814,17 +750,6 @@ escreve_dnn_json(){
 		dnn_N=$(echo "$dnn_N" | sed '1d')
 		dnn_sliceid=$(echo "$dnn_N" | sed -n '1p')
 		dnn_N=$(echo "$dnn_N" | sed '1d')
-
-#		echo "$i"
-#		echo "$dnn"
-#		echo "$dnn_id"
-#		echo "$dnn_name"
-#		echo "$dnn_eqosid"
-#		echo "$dnn_ip"
-#		echo "$dnn_ipv4"
-#		echo "$dnn_ipv6"
-#		echo "$dnn_default"
-#		echo "$dnn_sliceid"
 	
 	dnn_json+=",
                         {
@@ -879,7 +804,7 @@ escreve_dnn_json(){
 	
 }	# Essa chave fecha o escreve_dnn_json
 
-#--------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------ #
 
 escreve_apn_json(){
 #	$1  -> $apn_N(P)
@@ -911,58 +836,47 @@ escreve_apn_json(){
 		apn_N=$(echo "$apn_N" | sed '1d')
 		apn_ipv6=$(echo "$apn_N" | sed -n '1p')
 		apn_N=$(echo "$apn_N" | sed '1d')
-
-#		echo "$i"
-#		echo "$apn"
-#		echo "$apn_eqosid"
-#		echo "$apn_id"
-#		echo "$apn_name"
-#		echo "$apn_ip"
-#		echo "$apn_ipv4"
-#		echo "$apn_ipv6"
-	
-	apn_json+=",
+		
+		apn_json+=",
 						{
-                            "servico":{
-                                "id":"$apn"
+                            \"servico\":{
+                                \"id\":\"$apn\"
                             },
-                            "operacao":{
-                                "id":"ACT"
+                            \"operacao\":{
+                                \"id\":\"ACT\"
                             },
-                            "parametro":[
+                            \"parametro\":[
 								{
-									"nome":"EQOSID",
-									"valor":"$apn_eqosid"
+									\"nome\":\"EQOSID\",
+									\"valor\":\"$apn_eqosid\"
 								},
                                 {
-                                    "nome":"APNID",
-                                    "valor":"$apn_id"
+                                    \"nome\":\"APNID\",
+                                    \"valor\":\"$apn_id\"
                                 },
 								{
-									"nome":"APNNAME",
-									"valor":"$apn_name"
+									\"nome\":\"APNNAME\",
+									\"valor\":\"$apn_name\"
 								},
                                 {
-                                    "nome":"TIPOIP",
-                                    "valor":"$apn_ip" 
+                                    \"nome\":\"TIPOIP\",
+                                    \"valor\":\"$apn_ip\" 
                                 },
                                 {
-                                    "nome":"IPV4",
-                                    "valor":"$apn_ipv4"
+                                    \"nome\":\"IPV4\",
+                                    \"valor\":\"$apn_ipv4\"
                                 },
                                 {
-                                    "nome":"IPV6",
-                                    "valor":"$apn_ipv6"
+                                    \"nome\":\"IPV6\",
+                                    \"valor\":\"$apn_ipv6\"
                                 }
                             ]
                         }"
 	done
-
 	echo "$apn_json"
-	
 }	# Essa chave fecha o escreve_apn_json
 
-#--------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------ #
 
 fecha_json(){
 	final="                    ]
@@ -975,7 +889,6 @@ fecha_json(){
 }"
 	echo "$final"
 }
-
 # ------------------------------------------------------------------------ #
 
 # ------------------------------- EXECUCAO ------------------------------- #
@@ -1021,28 +934,13 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		_5GSA_N=$(possui_feature "$lst_feature" "=5GSA;")
 		_5GSA_P=$(possui_feature "$lst_feature_prev" "=5GSA;")
 		slice_N=$(extrai_slice "$lst_feature")
-		slice_N_name_1=$(echo "$slice_N" | sed -n '1p')
-		slice_N_id_1=$(echo "$slice_N" | sed -n '2p')
-		slice_N_default_1=$(echo "$slice_N" | sed -n '3p')
-		slice_N_name_2=$(echo "$slice_N" | sed -n '4p')
-		slice_N_id_2=$(echo "$slice_N" | sed -n '5p')
-		slice_N_default_2=$(echo "$slice_N" | sed -n '6p')
 		slice_P=$(extrai_slice "$lst_feature_prev")
-		slice_P_name_1=$(echo "$slice_P" | sed -n '1p')
-		slice_P_id_1=$(echo "$slice_P" | sed -n '2p')
-		slice_P_default_1=$(echo "$slice_P" | sed -n '3p')
-		slice_P_name_2=$(echo "$slice_P" | sed -n '4p')
-		slice_P_id_2=$(echo "$slice_P" | sed -n '5p')
-		slice_P_default_2=$(echo "$slice_P" | sed -n '6p')
 		dnn_N=$(extrai_dnn "$lst_feature")
 		dnn_P=$(extrai_dnn "$lst_feature_prev")
-#		--
 		apn_N=$(extrai_apn "$lst_feature")
 		apn_P=$(extrai_apn "$lst_feature_prev")
-#		--		
 		
-		echo "------------------------"
-		echo "$nome_arquivo"
+		echo "----------------------------------------$nome_arquivo----------------------------------------$"
 #		echo "REQ_ID: $req_id"
 #		echo "Acao: $acao"
 #		echo "Telefone: $telefone"
@@ -1060,20 +958,22 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 #		echo "5GSA_P:---$_5GSA_P"
 #		echo "SLICE_N: $slice_N"
 #		echo "SLICE_P: $slice_P"
-#		if [ "$nome_arquivo" = "T0050_004" ]; then
-			echo "----------------------------------------$nome_arquivo----------------------------------------$"
-#			echo "slice N: $slice_N_name_1 $slice_N_id_1 $slice_N_default_1 / $slice_N_name_2 $slice_N_id_2 $slice_N_default_2"
-#			echo "slice P: $slice_P_name_1 $slice_P_id_1 $slice_P_default_1 / $slice_P_name_2 $slice_P_id_2 $slice_P_default_2"
+#		if [ "$nome_arquivo" = "T9999_999" ]; then
+#			echo "-----SLICE N-----"
+#			echo "$slice_N"
+#			echo "-----SLICE P-----"
+#			echo "$slice_P"
+#			echo "-----------------"
+#			echo "-----DNN N-----"
 #			echo "$dnn_N"
+#			echo "-----DNN P-----"
 #			echo "$dnn_P"
-#			echo "--------- apn_New"
+#			echo "-----APN N-----"
 #			echo "$apn_N"
-#			echo "--------- apn_Prev"
+#			echo "-----APN P-----"
 #			echo "$apn_P"
+#			echo "-----------------"
 #		fi
-#		echo "$dnn_N_qtd"
-#
-#
 #		echo "------------------------"
 #		echo "lst_feature: $lst_feature"
 #		echo "------------------------"
@@ -1083,14 +983,15 @@ for arquivo_origem in "$diretorio_origem"/*.{sql,js}; do
 		#Funcao1 	  $1		$2		$3			$4		 $5		 $6		  $7	   $8			$9			 ${10}	  ${11}	   ${12}	   ${13}	   ${14}	  ${15}
 		escreve_json "$req_id" "$acao" "$telefone" "$iccid" "$imsi" "$HLR_N" "$HLR_P" "$profile_N" "$profile_P" "$HSS_N" "$HSS_P" "$_5GNSA_N" "$_5GNSA_P" "$_5GSA_N" "$_5GSA_P"  > $arquivo_destino
 		
-		#Funcao2	 	  	$1				  $2			  $3				   $4				 $5			     $6					  $7				$8				$9					 ${10}			   ${11}		   ${12}
-		escreve_slice_json "$slice_N_name_1" "$slice_N_id_1" "$slice_N_default_1" "$slice_N_name_2" "$slice_N_id_2" "$slice_N_default_2" "$slice_P_name_1" "$slice_P_id_1" "$slice_P_default_1" "$slice_P_name_2" "$slice_P_id_2" "$slice_P_default_2" >> $arquivo_destino
+		#Funcao2			$1		   $2
+		escreve_slice_json "$slice_N" "ACT" >> $arquivo_destino
+		escreve_slice_json "$slice_p" "CAN" >> $arquivo_destino
 
 		#Funcao3		  $1	   $2
 		escreve_dnn_json "$dnn_N" "ACT" >> $arquivo_destino
 		escreve_dnn_json "$dnn_P" "CAN" >> $arquivo_destino
 
-		#Funcao4
+		#Funcao4		  $1	   $2
 		escreve_apn_json "$apn_N" "ACT" >> $arquivo_destino
 		escreve_apn_json "$apn_P" "CAN" >> $arquivo_destino
 
@@ -1102,5 +1003,6 @@ done
 
 echo "------------------------"
 echo "Processo concluido"
+echo "------------------------"
 
 # ------------------------------------------------------------------------ #
