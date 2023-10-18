@@ -61,14 +61,14 @@
 #		- Melhorado a remocao do ".sql" do nome do arquivo
 #		- Melhorado extrai_feature para aproveitar o codigo de 
 #		possui_feature
+#	v1.15 18/10/2023, Rafael:
+#		- Adicionado condicional no escreve_apn_json e escreve_dnn_json
+#		para só escrever os campos ipv4 e ipv6 quando for necessário
+#		- Resolvido bug do extrai_slice, extrai_dnn e extrai_apn para 
+#		que a contagem não seja duplicada
 # ------------------------------------------------------------------------ #
 # Testado em:
 #	4.1.2(1)-release (x86_64-redhat-linux-gnu)
-# ------------------------------------------------------------------------ #
-#
-# -------------- MELHORIAS A SEREM FEITAS PARA geraJSON_2.0 -------------- #
-#	- Criar uma função unica para testar a existencia do arquivo 
-#	e testar apenas uma vez para cada arquivo.
 # ------------------------------------------------------------------------ #
 # ------------------------------- VARIAVEIS ------------------------------ #
 
@@ -168,7 +168,7 @@ extrai_slice(){
 	#lista_slice=$(echo "$slice" | cut -c7-14)
 	
 	#Conta o numero de slice
-	num_slice=$(echo "$lista_slice" | grep -o "=SLICE" | wc -l)
+	num_slice=$(echo "$lista_slice" | grep -o "FTRCD=SLICE" | wc -l)
 	contador=1
 	limite=($num_slice)
 	((limite++))
@@ -198,7 +198,7 @@ extrai_dnn(){
 	lista_dnn=$(possui_feature "$lista_feature" "=DNN")
 	
 	#Conta o numero de dnn
-	num_dnn=$(echo "$lista_dnn" | grep -o "=DNN" | wc -l)
+	num_dnn=$(echo "$lista_dnn" | grep -o "FTRCD=DNN" | wc -l)
 	contador=1
 	limite=($num_dnn)
 	((limite++))
@@ -243,7 +243,7 @@ extrai_apn(){
 	#lista_apn=$(echo "$apn" | cut -c7-14)
 	
 	#Conta o numero de apn
-	num_apn=$(echo "$lista_apn" | grep -o "=APN0" | wc -l)
+	num_apn=$(echo "$lista_apn" | grep -o "FTRCD=APN0" | wc -l)
 	contador=1
 	limite=($num_apn)
 	((limite++))
@@ -710,15 +710,30 @@ escreve_dnn_json(){
                                 {
                                     \"nome\":\"TIPOIP\",
                                     \"valor\":\"$dnn_ip\" 
-                                },
+                                }"
+
+#	Se dnn_ipv4 nao estiver vazia, escrever o bloco com dnn_ipv4.
+		testa_dnn_ipv4=""
+		testa_dnn_ipv4=$dnn_ipv4
+		if [ -n "$testa_dnn_ipv4" ]; then
+			json+=",
                                 {
                                     \"nome\":\"IPV4\",
                                     \"valor\":\"$dnn_ipv4\"
-                                },
+                                }"
+		fi
+
+#	Se dnn_ipv6 nao estiver vazia, escrever o bloco com dnn_ipv6.
+		testa_dnn_ipv6=""
+		testa_dnn_ipv6=$dnn_ipv6
+		if [ -n "$testa_dnn_ipv6" ]; then
+			dnn_json+=",
                                 {
                                     \"nome\":\"IPV6\",
                                     \"valor\":\"$dnn_ipv6\"
-                                },
+                                }"
+		fi
+		dnn_json+=",
                                 {
                                     \"nome\":\"DEFAULT\",
                                     \"valor\":\"$dnn_default\"
@@ -790,15 +805,29 @@ escreve_apn_json(){
                                 {
                                     \"nome\":\"TIPOIP\",
                                     \"valor\":\"$apn_ip\" 
-                                },
+                                }"
+#	Se apn_ipv4 nao estiver vazia, escrever o bloco com apn_ipv4.
+	testa_apn_ipv4=""
+	testa_apn_ipv4=$apn_ipv4
+		if [ -n "$testa_apn_ipv4" ]; then
+			apn_json+=",
                                 {
                                     \"nome\":\"IPV4\",
                                     \"valor\":\"$apn_ipv4\"
-                                },
+                                }"
+		fi
+
+#	Se apn_ipv6 nao estiver vazia, escrever o bloco com apn_ipv6.
+	testa_apn_ipv6=""
+	testa_apn_ipv6=$apn_ipv6
+		if [ -n "$testa_apn_ipv6" ]; then
+			apn_json+=",
                                 {
                                     \"nome\":\"IPV6\",
                                     \"valor\":\"$apn_ipv6\"
-                                }
+                                }"
+		fi
+		apn_json+="
                             ]
                         }"
 	done
